@@ -1,4 +1,3 @@
-// src/screens/TransactionsScreen.tsx
 import React, { useState, useMemo } from "react";
 import {
   View,
@@ -11,6 +10,7 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -24,6 +24,8 @@ export default function TransactionsScreen({ navigation }: any) {
   const { transactions, deleteTransaction, addTransactionsBulk } = useTransactions();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "income" | "expense">("all");
+  const { width } = useWindowDimensions();
+  const isWeb = width > 768;
   
   // Import States
   const [importing, setImporting] = useState(false);
@@ -85,52 +87,20 @@ export default function TransactionsScreen({ navigation }: any) {
   };
 
   const renderItem = ({ item }: { item: Transaction }) => (
-    <View style={styles.txRow}>
-      <View
-        style={[
-          styles.txIcon,
-          {
-            backgroundColor:
-              item.type === "income" ? COLORS.incomeLight : COLORS.expenseLight,
-          },
-        ]}
-      >
-        <MaterialIcons
-          name={item.type === "income" ? "arrow-upward" : "arrow-downward"}
-          size={18}
-          color={item.type === "income" ? COLORS.income : COLORS.expense}
-        />
+    <View style={[styles.txRow, isWeb && styles.webTxRow]}>
+      <View style={[styles.txStatus, { backgroundColor: item.type === "income" ? COLORS.income : COLORS.expense }]} />
+      <View style={styles.txMainInfo}>
+        <Text style={styles.txDesc} numberOfLines={1}>{item.description}</Text>
+        <Text style={styles.txDate}>{formatDate(item.date)}</Text>
       </View>
-      <View style={styles.txInfo}>
-        <Text style={styles.txDesc} numberOfLines={1}>
-          {item.description}
-        </Text>
-        <View style={styles.txMeta}>
-          <Text style={styles.txCat}>{item.category}</Text>
-          <Text style={styles.txDot}>·</Text>
-          <Text style={styles.txDate}>{formatDate(item.date)}</Text>
-          {!item.isManualEntry && (
-            <>
-              <Text style={styles.txDot}>·</Text>
-              <Text style={styles.txExtre}>Ekstre</Text>
-            </>
-          )}
-        </View>
+      <View style={styles.txCategoryContainer}>
+        <Text style={styles.txCategory}>{item.category}</Text>
       </View>
       <View style={styles.txRight}>
-        <Text
-          style={[
-            styles.txAmount,
-            { color: item.type === "income" ? COLORS.income : COLORS.textPrimary },
-          ]}
-        >
-          {item.type === "income" ? "+" : "-"}
-          {formatCurrency(Math.abs(item.amount))}
+        <Text style={[styles.txAmount, { color: item.type === "income" ? COLORS.income : COLORS.textPrimary }]}>
+          {item.type === "income" ? "+" : "-"}{formatCurrency(Math.abs(item.amount))}
         </Text>
-        <TouchableOpacity
-          onPress={() => confirmDelete(item.id, item.description)}
-          style={styles.delBtn}
-        >
+        <TouchableOpacity onPress={() => confirmDelete(item.id, item.description)} style={styles.delBtn}>
           <MaterialIcons name="delete-outline" size={18} color={COLORS.textMuted} />
         </TouchableOpacity>
       </View>
@@ -139,83 +109,83 @@ export default function TransactionsScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <Text style={styles.title}>İşlem Geçmişi</Text>
-        <View style={styles.headerBtns}>
-          <TouchableOpacity
-            style={[styles.importBtn, importing && { opacity: 0.6 }]}
-            onPress={handleImport}
-            disabled={importing}
-          >
-            {importing ? (
-              <ActivityIndicator size="small" color={COLORS.primary} />
-            ) : (
-              <MaterialIcons name="file-upload" size={24} color={COLORS.primary} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => navigation.navigate("AddTransaction")}
-          >
-            <MaterialIcons name="add" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.searchBar}>
-        <MaterialIcons name="search" size={18} color={COLORS.textMuted} style={{ marginRight: 8 }} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="İşlem veya kategori ara..."
-          placeholderTextColor={COLORS.textMuted}
-          value={search}
-          onChangeText={setSearch}
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch("")}>
-            <MaterialIcons name="close" size={18} color={COLORS.textMuted} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={styles.filterRow}>
-        {(["all", "income", "expense"] as const).map((f) => (
-          <TouchableOpacity
-            key={f}
-            style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
-            onPress={() => setFilter(f)}
-          >
-            <Text
-              style={[styles.filterText, filter === f && styles.filterTextActive]}
-            >
-              {f === "all" ? "Tümü" : f === "income" ? "Gelir" : "Gider"}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        <Text style={styles.countText}>{filtered.length} işlem</Text>
-      </View>
-
-      <FlatList
-        data={filtered}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <MaterialIcons name="inbox" size={48} color={COLORS.textMuted} />
-            <Text style={styles.emptyText}>
-              {search ? "Arama sonucu bulunamadı." : "Henüz işlem yok."}
-            </Text>
+      <View style={[styles.container, isWeb && styles.webContainer]}>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}>İşlem Geçmişi</Text>
+            <Text style={styles.subtitle}>{transactions.length} kayıtlı işlem</Text>
           </View>
-        }
-      />
+          <View style={styles.headerBtns}>
+            <TouchableOpacity
+              style={styles.importBtn}
+              onPress={handleImport}
+              disabled={importing}
+            >
+              {importing ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : (
+                <>
+                  <MaterialIcons name="file-upload" size={18} color={COLORS.primary} />
+                  <Text style={styles.importBtnText}>İçeri Aktar</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => navigation.navigate("AddTransaction")}
+            >
+              <MaterialIcons name="add" size={20} color="#fff" />
+              <Text style={styles.addBtnText}>Yeni Ekle</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={[styles.tools, isWeb && styles.webTools]}>
+          <View style={styles.searchBar}>
+            <MaterialIcons name="search" size={20} color={COLORS.textMuted} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Ara..."
+              placeholderTextColor={COLORS.textMuted}
+              value={search}
+              onChangeText={setSearch}
+            />
+          </View>
+          <View style={styles.filterRow}>
+            {(["all", "income", "expense"] as const).map((f) => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
+                onPress={() => setFilter(f)}
+              >
+                <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
+                  {f === "all" ? "Tümü" : f === "income" ? "Gelir" : "Gider"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <FlatList
+          data={filtered}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <MaterialIcons name="receipt" size={60} color={COLORS.textMuted} />
+              <Text style={styles.emptyTitle}>Kayıt Bulunamadı</Text>
+              <Text style={styles.emptyText}>Herhangi bir işlem verisi mevcut değil.</Text>
+            </View>
+          }
+        />
+      </View>
 
       <Modal visible={showPreview} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, isWeb && { width: 600, alignSelf: "center", marginBottom: "5%" }]}>
             <Text style={styles.modalTitle}>İçeri Aktarma Önizleme</Text>
             <Text style={styles.modalSub}>{previewData.length} işlem bulundu.</Text>
-            
             <ScrollView style={styles.previewList}>
               {previewData.map((item, idx) => (
                 <View key={idx} style={styles.previewRow}>
@@ -229,13 +199,12 @@ export default function TransactionsScreen({ navigation }: any) {
                 </View>
               ))}
             </ScrollView>
-
             <View style={styles.modalBtns}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowPreview(false)}>
                 <Text style={styles.cancelBtnText}>İptal</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.confirmBtn} onPress={confirmImport}>
-                <Text style={styles.confirmBtnText}>Onayla ve Kaydet</Text>
+                <Text style={styles.confirmBtnText}>Onayla</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -244,6 +213,109 @@ export default function TransactionsScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1, padding: 20 },
+  webContainer: { padding: 32 },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  title: { fontSize: 24, fontWeight: "800", color: COLORS.textPrimary, letterSpacing: -0.5 },
+  subtitle: { fontSize: 13, color: COLORS.textMuted, marginTop: 4 },
+  headerBtns: { flexDirection: "row", gap: 12 },
+  importBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    gap: 6,
+  },
+  importBtnText: { color: COLORS.primary, fontSize: 13, fontWeight: "600" },
+  addBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    gap: 6,
+  },
+  addBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  tools: { gap: 16, marginBottom: 20 },
+  webTools: { flexDirection: "row", alignItems: "center" },
+  searchBar: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: 8,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: COLORS.textPrimary },
+  filterRow: { flexDirection: "row", gap: 8 },
+  filterBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  filterBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  filterText: { fontSize: 12, color: COLORS.textSecondary, fontWeight: "600" },
+  filterTextActive: { color: "#fff" },
+  list: { paddingBottom: 40 },
+  txRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  webTxRow: { paddingHorizontal: 24 },
+  txStatus: { width: 4, height: 24, borderRadius: 2, marginRight: 16 },
+  txMainInfo: { flex: 2, gap: 4 },
+  txDesc: { fontSize: 15, fontWeight: "700", color: COLORS.textPrimary },
+  txDate: { fontSize: 12, color: COLORS.textMuted },
+  txCategoryContainer: { flex: 1, alignItems: "flex-start" },
+  txCategory: { fontSize: 12, color: COLORS.textSecondary, backgroundColor: COLORS.background, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, overflow: "hidden" },
+  txRight: { flex: 1, alignItems: "flex-end", gap: 4 },
+  txAmount: { fontSize: 16, fontWeight: "800" },
+  delBtn: { padding: 4, marginTop: 4 },
+  emptyState: { alignItems: "center", paddingVertical: 100, gap: 16 },
+  emptyTitle: { fontSize: 18, fontWeight: "700", color: COLORS.textPrimary },
+  emptyText: { fontSize: 14, color: COLORS.textSecondary, textAlign: "center" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.8)", justifyContent: "center", padding: 20 },
+  modalContent: { backgroundColor: COLORS.card, borderRadius: 24, padding: 24, maxHeight: "85%", borderWidth: 1, borderColor: COLORS.border },
+  modalTitle: { fontSize: 20, fontWeight: "800", color: COLORS.textPrimary, marginBottom: 8 },
+  modalSub: { fontSize: 14, color: COLORS.textSecondary, marginBottom: 20 },
+  previewList: { marginBottom: 24 },
+  previewRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  previewInfo: { gap: 4 },
+  previewDesc: { fontSize: 14, fontWeight: "700", color: COLORS.textPrimary },
+  previewDate: { fontSize: 12, color: COLORS.textMuted },
+  previewAmount: { fontSize: 15, fontWeight: "800" },
+  modalBtns: { flexDirection: "row", gap: 12 },
+  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: "center", backgroundColor: COLORS.background },
+  cancelBtnText: { color: COLORS.textSecondary, fontWeight: "700" },
+  confirmBtn: { flex: 2, paddingVertical: 14, borderRadius: 12, alignItems: "center", backgroundColor: COLORS.primary },
+  confirmBtnText: { color: "#fff", fontWeight: "700" },
+});
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },

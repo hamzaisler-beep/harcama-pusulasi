@@ -51,19 +51,21 @@ export const CATEGORY_ICONS: Record<string, string> = {
 };
 
 export const COLORS = {
-  primary: "#185FA5",
-  primaryLight: "#E6F1FB",
-  primaryDark: "#0C447C",
-  income: "#3B6D11",
-  incomeLight: "#EAF3DE",
-  expense: "#A32D2D",
-  expenseLight: "#FCEBEB",
-  amber: "#854F0B",
-  amberLight: "#FAEEDA",
-  background: "#F4F7FB",
-  card: "#FFFFFF",
-  border: "#E2E8F0",
-  textPrimary: "#1A202C",
-  textSecondary: "#718096",
-  textMuted: "#A0AEC0",
+  primary: "#22c55e", // Emerald green
+  primaryLight: "rgba(34, 197, 94, 0.1)",
+  primaryDark: "#16a34a",
+  income: "#22c55e",
+  incomeLight: "rgba(34, 197, 94, 0.15)",
+  expense: "#ef4444", // Pinkish-red
+  expenseLight: "rgba(239, 68, 68, 0.15)",
+  amber: "#f59e0b",
+  amberLight: "rgba(245, 158, 11, 0.15)",
+  background: "#0A0A0A", // Deep black
+  card: "#171717", // Dark gray card
+  cardSecondary: "#1F1F1F",
+  border: "rgba(255, 255, 255, 0.08)",
+  textPrimary: "#FFFFFF",
+  textSecondary: "#A3A3A3",
+  textMuted: "#525252",
+  glass: "rgba(23, 23, 23, 0.7)",
 };
