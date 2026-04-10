@@ -10,18 +10,18 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import { LineChart } from "react-native-chart-kit";
-import { useTransactions } from "../store/useStore";
-import { useAuth } from "../store/useAuthStore";
-import { logout } from "../services/authService";
+import { BarChart, PieChart } from "react-native-chart-kit";
+import { useTransactions, useSavings } from "../store/useStore";
 import { COLORS } from "../types";
-import { formatCurrency, formatDate } from "../utils/format";
+import { formatCurrency } from "../utils/format";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function DashboardScreen({ navigation }: any) {
   const { transactions } = useTransactions();
-  const { user } = useAuth();
+  const { savings } = useSavings();
   const { width } = useWindowDimensions();
-  const isWeb = width > 768;
+  const isWeb = width > 1024;
 
   const { income, expense, balance } = useMemo(() => {
     const income = transactions
@@ -35,206 +35,186 @@ export default function DashboardScreen({ navigation }: any) {
     return { income, expense, balance: income - expense };
   }, [transactions]);
 
-  const chartData = useMemo(() => {
-    const days = 7;
-    const labels: string[] = [];
-    const incomeData: number[] = [];
-    const expenseData: number[] = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const ds = d.toISOString().split("T")[0];
-      labels.push(
-        d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" })
-      );
-      incomeData.push(
-        transactions
-          .filter((t) => t.date === ds && t.type === "income")
-          .reduce((s, t) => s + t.amount, 0)
-      );
-      expenseData.push(
-        Math.abs(
-          transactions
-            .filter((t) => t.date === ds && t.type === "expense")
-            .reduce((s, t) => s + t.amount, 0)
-        )
-      );
-    }
-    return { labels, incomeData, expenseData };
-  }, [transactions]);
-
-  const categoryTotals = useMemo(() => {
-    const cats: Record<string, number> = {};
-    transactions
-      .filter((t) => t.type === "expense")
-      .forEach((t) => {
-        cats[t.category] = (cats[t.category] || 0) + Math.abs(t.amount);
-      });
-    return Object.entries(cats)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4);
-  }, [transactions]);
+  const totalSavings = useMemo(() => {
+    // Demo calculation: Sum of all savings converted to TL (using mock rate 32)
+    return savings.reduce((sum, s) => sum + s.amount * 32, 0);
+  }, [savings]);
 
   const recentTx = transactions.slice(0, 6);
 
-  const StatCard = ({ title, value, type, icon }: any) => (
-    <View style={styles.statCard}>
-      <View style={styles.statHeader}>
-        <View style={[styles.statIcon, { backgroundColor: type === "income" ? COLORS.incomeLight : COLORS.expenseLight }]}>
-          <MaterialIcons name={icon} size={20} color={type === "income" ? COLORS.income : COLORS.expense} />
-        </View>
-        <Text style={styles.statTitle}>{title}</Text>
-      </View>
-      <Text style={[styles.statValue, { color: type === "income" ? COLORS.income : COLORS.textPrimary }]}>
-        {formatCurrency(value)}
-      </Text>
-    </View>
-  );
+  // Mock Category Data for Donut Chart
+  const categoryData = useMemo(() => {
+    const data = [
+      { name: "Market", amount: 2800, color: COLORS.expense, legendFontColor: "#7F7F7F" },
+      { name: "Giyim", amount: 1500, color: COLORS.primary, legendFontColor: "#7F7F7F" },
+      { name: "Ulaşım", amount: 1200, color: COLORS.amber, legendFontColor: "#7F7F7F" },
+      { name: "Sağlık", amount: 800, color: "#6366f1", legendFontColor: "#7F7F7F" },
+    ];
+    return data;
+  }, []);
+
+  const barData = {
+    labels: ["Eki", "Kas", "Ara", "Oca", "Şub", "Mar"],
+    datasets: [
+      {
+        data: [15000, 18000, 12000, 25000, 45000, 30000],
+        color: (opacity = 1) => `rgba(34, 197, 94, ${opacity})`,
+      },
+      {
+        data: [8000, 12000, 9000, 15000, 7869, 12000],
+        color: (opacity = 1) => `rgba(244, 63, 94, ${opacity})`,
+      }
+    ],
+  };
+
+  const chartConfig = {
+    backgroundGradientFrom: "#111",
+    backgroundGradientTo: "#111",
+    color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+    strokeWidth: 2,
+    barPercentage: 0.6,
+    useShadowColorFromDataset: false,
+    decimalPlaces: 0,
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView
-        style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, isWeb && styles.webScrollContent]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Dashboard</Text>
-            <Text style={styles.subGreeting}>Hoş geldin, {user?.displayName || "Kullanıcı"}</Text>
-          </View>
-          <View style={styles.headerBtnRow}>
-            {!isWeb && (
-              <TouchableOpacity style={styles.logoutBtn} onPress={() => logout()}>
-                <MaterialIcons name="logout" size={20} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={styles.addBtn}
-              onPress={() => navigation.navigate("AddTransaction")}
-            >
-              <MaterialIcons name="add" size={24} color="#fff" />
-              <Text style={styles.addBtnText}>İşlem Ekle</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Stats Grid */}
-        <View style={[styles.statsGrid, isWeb && styles.webStatsGrid]}>
-          <StatCard title="Net Bakiye" value={balance} type="balance" icon="account-balance" />
-          <StatCard title="Aylık Gelir" value={income} type="income" icon="arrow-upward" />
-          <StatCard title="Aylık Gider" value={expense} type="expense" icon="arrow-downward" />
-        </View>
-
-        {/* Main Content Layout */}
-        <View style={[styles.mainLayout, isWeb && styles.webMainLayout]}>
-          <View style={styles.leftCol}>
-            {/* Chart Card */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>Harcama Analizi</Text>
-                <Text style={styles.cardSub}>Son 7 Günlük Veri</Text>
-              </View>
-              {transactions.length > 0 ? (
-                <LineChart
-                  data={{
-                    labels: chartData.labels,
-                    datasets: [
-                      { data: chartData.expenseData, color: () => COLORS.expense, strokeWidth: 3 },
-                      { data: chartData.incomeData, color: () => COLORS.income, strokeWidth: 2, withDots: false },
-                    ],
-                  }}
-                  width={isWeb ? width - 360 : width - 40}
-                  height={220}
-                  chartConfig={{
-                    backgroundGradientFrom: COLORS.card,
-                    backgroundGradientTo: COLORS.card,
-                    color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                    labelColor: () => COLORS.textSecondary,
-                    strokeWidth: 2,
-                    barPercentage: 0.5,
-                    useShadowColorFromDataset: false,
-                    decimalPlaces: 0,
-                    propsForDots: { r: "4", strokeWidth: "2", stroke: COLORS.card },
-                  }}
-                  bezier
-                  style={styles.chart}
-                  withInnerLines={false}
-                />
-              ) : (
-                <View style={[styles.emptyState, { height: 200 }]}>
-                    <Text style={styles.emptyText}>Veri bulunamadı</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Quick Actions (Web Only or as widget) */}
-            {isWeb && (
-                <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Hızlı İşlemler</Text>
-                    <View style={styles.quickActions}>
-                        {["Gıda", "Ulaşım", "Kira", "Market"].map(cat => (
-                            <TouchableOpacity key={cat} style={styles.quickActionBtn}>
-                                <Text style={styles.quickActionText}>{cat}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-            )}
-          </View>
-
-          <View style={styles.rightCol}>
-            {/* Recent Transactions */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>Son İşlemler</Text>
-                <TouchableOpacity onPress={() => navigation.navigate("Transactions")}>
-                  <Text style={styles.seeAll}>Tümünü Gör</Text>
+            <Text style={styles.pageTitle}>Dashboard</Text>
+            <View style={styles.headerActions}>
+                <TouchableOpacity style={styles.headerIconBtn}>
+                    <MaterialIcons name="notifications-none" size={20} color={COLORS.textSecondary} />
                 </TouchableOpacity>
-              </View>
-              {recentTx.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>Henüz işlem yok</Text>
-                </View>
-              ) : (
-                recentTx.map((t) => (
-                  <View key={t.id} style={styles.txRow}>
-                    <View style={[styles.txDot, { backgroundColor: t.type === "income" ? COLORS.incomeLight : COLORS.expenseLight }]} />
-                    <View style={styles.txInfo}>
-                      <Text style={styles.txDesc} numberOfLines={1}>{t.description}</Text>
-                      <Text style={styles.txDate}>{formatDate(t.date)}</Text>
-                    </View>
-                    <Text style={[styles.txAmount, { color: t.type === "income" ? COLORS.income : COLORS.textPrimary }]}>
-                      {t.type === "income" ? "+" : "-"}{formatCurrency(Math.abs(t.amount))}
-                    </Text>
+                <TouchableOpacity 
+                    style={styles.addBtn}
+                    onPress={() => navigation.navigate("AddTransaction")}
+                >
+                    <MaterialIcons name="add" size={18} color="#fff" />
+                    <Text style={styles.addBtnText}>Ekle</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+
+        {/* Top Stats Row */}
+        <View style={[styles.statRow, isWeb && styles.statRowWeb]}>
+          <StatCard 
+            title="Bu Ay Gelir" 
+            value={income || 65500} 
+            icon="payments" 
+            color={COLORS.income} 
+            change="+31% geçen ay" 
+          />
+          <StatCard 
+            title="Bu Ay Gider" 
+            value={expense || 7869} 
+            icon="shopping-bag" 
+            color={COLORS.expense} 
+            change="+96% geçen ay" 
+          />
+          <StatCard 
+            title="Net Bakiye" 
+            value={balance || 57631} 
+            icon="balance" 
+            color={COLORS.amber} 
+            change="Olumlu" 
+            isBalance 
+          />
+          <StatCard 
+            title="Toplam Birikim" 
+            value={totalSavings || 177500} 
+            icon="track-changes" 
+            color="#a855f7" 
+            change="4 aktif hedef" 
+          />
+        </View>
+
+        {/* Charts Row */}
+        <View style={[styles.mainGrid, isWeb && styles.mainGridWeb]}>
+          <View style={[styles.card, { flex: 1.2 }]}>
+            <Text style={styles.cardTitle}>AYLIK GELİR / GİDER</Text>
+            <BarChart
+              style={styles.chart}
+              data={barData}
+              width={isWeb ? (width - 320) * 0.53 : SCREEN_WIDTH - 40}
+              height={220}
+              yAxisLabel="₺"
+              yAxisSuffix=""
+              chartConfig={chartConfig}
+              verticalLabelRotation={0}
+              fromZero
+              showBarTops={false}
+              withInnerLines={false}
+            />
+          </View>
+          <View style={[styles.card, { flex: 1 }]}>
+            <Text style={styles.cardTitle}>KATEGORİ DAĞILIMI</Text>
+            <PieChart
+              data={categoryData}
+              width={isWeb ? (width - 320) * 0.4 : SCREEN_WIDTH - 40}
+              height={220}
+              chartConfig={chartConfig}
+              accessor={"amount"}
+              backgroundColor={"transparent"}
+              paddingLeft={"15"}
+              center={[10, 0]}
+              absolute
+              hasLegend={true}
+            />
+          </View>
+        </View>
+
+        {/* Bottom Row */}
+        <View style={[styles.mainGrid, isWeb && styles.mainGridWeb]}>
+          {/* Son İşlemler */}
+          <View style={[styles.card, { flex: 1.2 }]}>
+            <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>SON İŞLEMLER</Text>
+                <TouchableOpacity onPress={() => navigation.navigate("Transactions")}>
+                    <Text style={styles.viewAll}>Tümünü Gör</Text>
+                </TouchableOpacity>
+            </View>
+            <View style={styles.transactionList}>
+              {recentTx.length > 0 ? recentTx.map((t) => (
+                <View key={t.id} style={styles.tRow}>
+                  <View style={styles.tIconBox}>
+                    <MaterialIcons 
+                        name={t.type === "income" ? "arrow-downward" : "arrow-upward"} 
+                        size={16} 
+                        color={t.type === "income" ? COLORS.income : COLORS.expense} 
+                    />
                   </View>
-                ))
+                  <View style={styles.tInfo}>
+                    <Text style={styles.tName} numberOfLines={1}>{t.title || t.description}</Text>
+                    <Text style={styles.tMeta}>{t.category} • Banka</Text>
+                  </View>
+                  <Text style={[styles.tAmount, { color: t.type === "income" ? COLORS.income : COLORS.expense }]}>
+                    {t.type === "income" ? "+" : "-"}{formatCurrency(Math.abs(t.amount))}
+                  </Text>
+                </View>
+              )) : (
+                <View style={styles.emptyBox}>
+                    <Text style={styles.emptyText}>Henüz işlem yok.</Text>
+                </View>
               )}
             </View>
+          </View>
 
-            {/* Categories */}
-            {categoryTotals.length > 0 && (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Kategori Bazlı</Text>
-                <View style={styles.catList}>
-                  {categoryTotals.map(([cat, val], i) => {
-                    const pct = expense > 0 ? Math.round((val / expense) * 100) : 0;
-                    return (
-                      <View key={i} style={styles.catRow}>
-                        <View style={styles.catHeader}>
-                          <Text style={styles.catName}>{cat}</Text>
-                          <Text style={styles.catVal}>{formatCurrency(val)}</Text>
-                        </View>
-                        <View style={styles.progressBg}>
-                          <View style={[styles.progressFill, { width: `${pct}%` }]} />
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
+          {/* Bütçe Durumu */}
+          <View style={[styles.card, { flex: 1 }]}>
+            <Text style={styles.cardTitle}>BÜTÇE DURUMU</Text>
+            <View style={styles.budgetList}>
+                <BudgetProgress label="Market" current={2800} limit={3000} color={COLORS.expense} />
+                <BudgetProgress label="Restoran" current={450} limit={1500} color={COLORS.primary} />
+                <BudgetProgress label="Ulaşım" current={1200} limit={2000} color={COLORS.amber} />
+                <BudgetProgress label="Eğlence" current={139} limit={1000} color="#6366f1" />
+                <BudgetProgress label="Giyim" current={1800} limit={2000} color={COLORS.expense} />
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -242,88 +222,226 @@ export default function DashboardScreen({ navigation }: any) {
   );
 }
 
+function StatCard({ title, value, icon, color, change, isBalance }: any) {
+  return (
+    <View style={styles.statCard}>
+      <View style={styles.statHeader}>
+        <Text style={styles.statTitle}>{title}</Text>
+        <MaterialIcons name={icon} size={20} color={color} />
+      </View>
+      <Text style={[styles.statValue, isBalance && { color: COLORS.amber }]}>{formatCurrency(value)}</Text>
+      <Text style={styles.statChange}>{change}</Text>
+    </View>
+  );
+}
+
+function BudgetProgress({ label, current, limit, color }: any) {
+  const pct = Math.min((current / limit) * 100, 100);
+  return (
+    <View style={styles.budgetRow}>
+        <View style={styles.budgetHeader}>
+            <Text style={styles.budgetLabel}>{label}</Text>
+            <Text style={styles.budgetValue}>{formatCurrency(current)} / {formatCurrency(limit)}</Text>
+        </View>
+        <View style={styles.progressBarBg}>
+            <View style={[styles.progressBarFill, { width: `${pct}%`, backgroundColor: color }]} />
+        </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.background },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 40 },
+  safe: { flex: 1, backgroundColor: "#000" },
+  scrollContent: { padding: 20, gap: 24, paddingBottom: 40 },
   webScrollContent: { padding: 32 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 32,
+    marginBottom: 8,
   },
-  greeting: { fontSize: 24, fontWeight: "800", color: COLORS.textPrimary, letterSpacing: -0.5 },
-  subGreeting: { fontSize: 14, color: COLORS.textSecondary, marginTop: 4 },
+  pageTitle: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.5,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  headerIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
     backgroundColor: COLORS.primary,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
-    gap: 8,
   },
-  addBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
-  headerBtnRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  logoutBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: COLORS.card,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: COLORS.border,
+  addBtnText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 13,
   },
-  statsGrid: { gap: 16, marginBottom: 24 },
-  webStatsGrid: { flexDirection: "row" },
+  statRow: {
+    gap: 16,
+  },
+  statRowWeb: {
+    flexDirection: "row",
+  },
   statCard: {
     flex: 1,
-    backgroundColor: COLORS.card,
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  statHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
-  statIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  statTitle: { fontSize: 14, color: COLORS.textSecondary, fontWeight: "500" },
-  statValue: { fontSize: 22, fontWeight: "800", letterSpacing: -0.5 },
-  mainLayout: { gap: 24 },
-  webMainLayout: { flexDirection: "row" },
-  leftCol: { flex: 2, gap: 24 },
-  rightCol: { flex: 1, gap: 24 },
-  card: {
-    backgroundColor: COLORS.card,
-    borderRadius: 16,
+    backgroundColor: "#111",
     padding: 24,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: "rgba(255,255,255,0.05)",
   },
-  cardHeader: { marginBottom: 20 },
-  cardTitle: { fontSize: 16, fontWeight: "700", color: COLORS.textPrimary },
-  cardSub: { fontSize: 12, color: COLORS.textMuted, marginTop: 4 },
-  chart: { marginTop: 16, marginLeft: -16 },
-  txRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  txDot: { width: 8, height: 8, borderRadius: 4, marginRight: 16 },
-  txInfo: { flex: 1, gap: 4 },
-  txDesc: { fontSize: 14, fontWeight: "600", color: COLORS.textPrimary },
-  txDate: { fontSize: 12, color: COLORS.textMuted },
-  txAmount: { fontSize: 15, fontWeight: "700" },
-  seeAll: { fontSize: 13, color: COLORS.primary, fontWeight: "600" },
-  catList: { gap: 16 },
-  catRow: { gap: 8 },
-  catHeader: { flexDirection: "row", justifyContent: "space-between" },
-  catName: { fontSize: 13, fontWeight: "600", color: COLORS.textSecondary },
-  catVal: { fontSize: 13, fontWeight: "700", color: COLORS.textPrimary },
-  progressBg: { height: 6, backgroundColor: COLORS.background, borderRadius: 3, overflow: "hidden" },
-  progressFill: { height: 6, backgroundColor: COLORS.primary, borderRadius: 3 },
-  emptyState: { alignItems: "center", justifyContent: "center" },
-  emptyText: { color: COLORS.textMuted, fontSize: 14 },
-  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
-  quickActionBtn: { backgroundColor: COLORS.background, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border },
-  quickActionText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: "500" },
+  statHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  statTitle: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  statValue: {
+    color: "#fff",
+    fontSize: 28,
+    fontWeight: "900",
+    letterSpacing: -1,
+  },
+  statChange: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 8,
+  },
+  mainGrid: {
+    gap: 20,
+  },
+  mainGridWeb: {
+    flexDirection: "row",
+  },
+  card: {
+    backgroundColor: "#111",
+    padding: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  cardTitle: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+    marginBottom: 20,
+  },
+  viewAll: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  chart: {
+    marginVertical: 8,
+    borderRadius: 16,
+    marginLeft: -15,
+  },
+  transactionList: {
+    gap: 4,
+  },
+  tRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.03)",
+  },
+  tIconBox: {
+    width: 38,
+    height: 38,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 16,
+  },
+  tInfo: {
+    flex: 1,
+  },
+  tName: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  tMeta: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    marginTop: 3,
+  },
+  tAmount: {
+    fontSize: 15,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+  },
+  budgetList: {
+    gap: 22,
+  },
+  budgetRow: {
+    gap: 10,
+  },
+  budgetHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+  },
+  budgetLabel: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  budgetValue: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  progressBarBg: {
+    height: 6,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  emptyBox: {
+    paddingVertical: 40,
+    alignItems: "center",
+  },
+  emptyText: {
+    color: COLORS.textMuted,
+    fontSize: 13,
+  },
 });
 
 const styles = StyleSheet.create({

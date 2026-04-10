@@ -13,17 +13,19 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useTransactions } from "../store/useStore";
+import { useTransactions, useAccounts } from "../store/useStore";
 import { CATEGORIES, COLORS, TransactionType } from "../types";
 import { formatCurrency, todayISO } from "../utils/format";
 
 export default function AddTransactionScreen({ navigation }: any) {
   const { addTransaction } = useTransactions();
+  const { accounts } = useAccounts();
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [date, setDate] = useState(todayISO());
   const [type, setType] = useState<TransactionType>("expense");
+  const [accountId, setAccountId] = useState(accounts[0]?.id || "");
 
   const handleAdd = () => {
     if (!description.trim()) {
@@ -35,8 +37,20 @@ export default function AddTransactionScreen({ navigation }: any) {
       Alert.alert("Geçersiz Miktar", "Lütfen geçerli bir tutar girin.");
       return;
     }
-    const finalAmount = type === "expense" ? -Math.abs(parsedAmount) : Math.abs(parsedAmount);
-    const added = addTransaction({ description: description.trim(), amount: finalAmount, category, date, type }, true);
+    if (!accountId) {
+      Alert.alert("Eksik Bilgi", "Lütfen bir hesap seçin.");
+      return;
+    }
+    const finalAmount = Math.abs(parsedAmount);
+    const added = addTransaction({ 
+        description: description.trim(), 
+        amount: finalAmount, 
+        category, 
+        date, 
+        type, 
+        accountId 
+    }, true);
+
     if (added) {
       Alert.alert("Başarılı", "İşlem eklendi.", [
         { text: "Tamam", onPress: () => navigation.goBack() },
@@ -60,7 +74,7 @@ export default function AddTransactionScreen({ navigation }: any) {
           <View style={{ width: 38 }} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {/* Type Toggle */}
           <View style={styles.typeToggle}>
             <TouchableOpacity
@@ -94,6 +108,23 @@ export default function AddTransactionScreen({ navigation }: any) {
                 autoFocus
               />
             </View>
+          </View>
+
+          {/* Account Selector */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Hesap Seçin</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accScroll}>
+                {accounts.map(acc => (
+                    <TouchableOpacity 
+                        key={acc.id} 
+                        style={[styles.accBtn, accountId === acc.id && { borderColor: acc.color, backgroundColor: acc.color + "15" }]}
+                        onPress={() => setAccountId(acc.id)}
+                    >
+                        <Text style={[styles.accBtnText, accountId === acc.id && { color: acc.color }]}>{acc.name}</Text>
+                        <Text style={styles.accBtnBal}>{formatCurrency(acc.balance)}</Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
           </View>
 
           {/* Description */}
@@ -138,19 +169,6 @@ export default function AddTransactionScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Summary */}
-          {description.trim() && parseFloat(amount) > 0 && (
-            <View style={[styles.summary, { borderColor: type === "expense" ? COLORS.expense : COLORS.income, borderLeftColor: type === "expense" ? COLORS.expense : COLORS.income }]}>
-              <Text style={styles.summaryText}>
-                {type === "expense" ? "Gider: " : "Gelir: "}
-                <Text style={{ fontWeight: "700", color: type === "expense" ? COLORS.expense : COLORS.income }}>
-                  {formatCurrency(parseFloat(amount.replace(",", ".")) || 0)}
-                </Text>
-                {" — "}{description}
-              </Text>
-            </View>
-          )}
-
           {/* Submit */}
           <TouchableOpacity style={styles.submitBtn} onPress={handleAdd}>
             <MaterialIcons name="check" size={20} color="#fff" />
@@ -161,6 +179,82 @@ export default function AddTransactionScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: "#000" },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#111",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.05)",
+  },
+  backBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
+  title: { flex: 1, textAlign: "center", fontSize: 17, fontWeight: "700", color: "#fff" },
+  content: { padding: 20, gap: 20 },
+  typeToggle: { flexDirection: "row", backgroundColor: "#111", borderRadius: 14, padding: 4, gap: 4 },
+  typeBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, borderRadius: 10 },
+  typeBtnExpense: { backgroundColor: COLORS.expenseLight },
+  typeBtnIncome: { backgroundColor: COLORS.incomeLight },
+  typeBtnText: { fontSize: 14, fontWeight: "600", color: COLORS.textSecondary },
+  amountCard: {
+    backgroundColor: "#111",
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  amountLabel: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 8, fontWeight: "600" },
+  amountRow: { flexDirection: "row", alignItems: "center" },
+  currency: { fontSize: 32, fontWeight: "800", marginRight: 6 },
+  amountInput: { fontSize: 48, fontWeight: "800", minWidth: 120, textAlign: "center" },
+  field: { gap: 10 },
+  label: { fontSize: 13, fontWeight: "700", color: COLORS.textSecondary },
+  accScroll: { paddingVertical: 4 },
+  accBtn: { padding: 12, borderRadius: 12, backgroundColor: "#111", borderWidth: 1, borderColor: "rgba(255,255,255,0.05)", marginRight: 10, minWidth: 100 },
+  accBtnText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "700" },
+  accBtnBal: { color: COLORS.textMuted, fontSize: 11, marginTop: 2 },
+  input: {
+    backgroundColor: "#111",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: "#fff",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  catGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  catChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#111",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  catChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  catChipText: { fontSize: 12, color: COLORS.textSecondary, fontWeight: "600" },
+  catChipTextActive: { color: "#fff" },
+  submitBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
+    paddingVertical: 16,
+    gap: 8,
+    marginTop: 10,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  submitText: { fontSize: 16, fontWeight: "800", color: "#fff" },
+});
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
