@@ -1,4 +1,3 @@
-// src/screens/ReportsScreen.tsx
 import React, { useState, useMemo } from "react";
 import {
   View,
@@ -8,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -29,6 +29,8 @@ export default function ReportsScreen() {
   const { transactions } = useTransactions();
   const [loading, setLoading] = useState(false);
   const [insights, setInsights] = useState<Insight | null>(null);
+  const { width } = useWindowDimensions();
+  const isWeb = width > 768;
 
   const income = useMemo(
     () => transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0),
@@ -59,7 +61,6 @@ export default function ReportsScreen() {
       const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY;
       
       if (!apiKey || apiKey === "sk-ant-..." || apiKey.length < 20) {
-        console.warn("Anthropic API anahtarı geçersiz veya bulunamadı.");
         throw new Error("API_KEY_MISSING");
       }
 
@@ -89,40 +90,16 @@ export default function ReportsScreen() {
         messages: [{ role: "user", content: prompt }],
       });
 
-      const text = response.content[0].text;
+      const text = response.content[0].type === 'text' ? response.content[0].text : '';
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       const jsonString = jsonMatch ? jsonMatch[0] : text;
       const parsed = JSON.parse(jsonString);
       
-      setInsights({
-        overallSummary: parsed.overallSummary,
-        topCategory: parsed.topCategory,
-        topCategoryAmount: parsed.topCategoryAmount,
-        spendingRate: parsed.spendingRate,
-        recommendation: parsed.recommendation,
-        unusualNote: parsed.unusualNote,
-      });
+      setInsights(parsed);
 
     } catch (e: any) {
       console.error("AI Analysis Error", e);
-      
-      if (e.message === "API_KEY_MISSING") {
-        Alert.alert("API Anahtarı Eksik", "Lütfen .env dosyasına EXPO_PUBLIC_ANTHROPIC_API_KEY ekleyin.");
-      } else {
-        Alert.alert("Analiz Hatası", "Yapay zeka analizi sırasında bir hata oluştu. Lütfen tekrar deneyin.");
-      }
-
-      // Hata durumunda demo verisi ile devam edelim (UI'ın tamamen çökmemesi için alternatif)
-      const topCat = categoryTotals[0];
-      const rate = income > 0 ? Math.round((expense / income) * 100) : 0;
-      setInsights({
-        overallSummary: `[Demo] Analiz tamamlanamadı ancak yerel özet: ${transactions.length} işlem.`,
-        topCategory: topCat ? topCat[0] : "Yok",
-        topCategoryAmount: topCat ? topCat[1] : 0,
-        spendingRate: rate,
-        recommendation: "Ağ bağlantınızı veya API anahtarınızı kontrol edin.",
-        unusualNote: null,
-      });
+      Alert.alert("Hata", "AI Analizi sırasında bir sorun oluştu.");
     } finally {
       setLoading(false);
     }
@@ -130,11 +107,11 @@ export default function ReportsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, isWeb && styles.webContent]} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.title}>Raporlar</Text>
-            <Text style={styles.subtitle}>Harcama analizi ve AI önerileri</Text>
+            <Text style={styles.title}>Raporlar \u0026 Analiz</Text>
+            <Text style={styles.subtitle}>Finansal sağlığınızı AI ile optimize edin</Text>
           </View>
           <TouchableOpacity
             style={[styles.analyzeBtn, loading && styles.analyzeBtnDisabled]}
@@ -145,100 +122,148 @@ export default function ReportsScreen() {
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
-                <MaterialIcons name="auto-awesome" size={16} color="#fff" />
-                <Text style={styles.analyzeBtnText}>Analiz Et</Text>
+                <MaterialIcons name="auto-awesome" size={18} color="#fff" />
+                <Text style={styles.analyzeBtnText}>AI Analizi Başlat</Text>
               </>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* Summary */}
-        <View style={styles.summaryRow}>
-          <View style={[styles.summaryCard, { backgroundColor: COLORS.incomeLight }]}>
-            <MaterialIcons name="trending-up" size={20} color={COLORS.income} />
-            <Text style={[styles.summaryLabel, { color: COLORS.income }]}>Toplam Gelir</Text>
-            <Text style={[styles.summaryValue, { color: COLORS.income }]}>{formatCurrency(income)}</Text>
-          </View>
-          <View style={[styles.summaryCard, { backgroundColor: COLORS.expenseLight }]}>
-            <MaterialIcons name="trending-down" size={20} color={COLORS.expense} />
-            <Text style={[styles.summaryLabel, { color: COLORS.expense }]}>Toplam Gider</Text>
-            <Text style={[styles.summaryValue, { color: COLORS.expense }]}>{formatCurrency(expense)}</Text>
-          </View>
-        </View>
-
-        {/* AI Insights */}
-        {insights && (
-          <View style={styles.card}>
-            <View style={styles.aiHeader}>
-              <MaterialIcons name="psychology" size={20} color={COLORS.primary} />
-              <Text style={styles.cardTitle}>AI Analizi</Text>
-            </View>
-            <Text style={styles.summary}>{insights.overallSummary}</Text>
-
-            <View style={styles.insightRow}>
-              <View style={[styles.insightBadge, { backgroundColor: COLORS.expenseLight }]}>
-                <Text style={[styles.insightBadgeLabel, { color: COLORS.expense }]}>EN YÜKSEK KATEGORİ</Text>
-                <Text style={[styles.insightBadgeValue, { color: COLORS.expense }]}>
-                  {insights.topCategory} — {formatCurrency(insights.topCategoryAmount)}
-                </Text>
+        <View style={[styles.mainLayout, isWeb && styles.webMainLayout]}>
+          <View style={styles.leftCol}>
+            {/* Summary Cards */}
+            <View style={styles.summaryGrid}>
+              <View style={[styles.summaryCard, { borderColor: COLORS.income }]}>
+                <Text style={styles.summaryLabel}>Toplam Gelir</Text>
+                <Text style={[styles.summaryValue, { color: COLORS.income }]}>{formatCurrency(income)}</Text>
               </View>
-              <View style={[styles.insightBadge, { backgroundColor: COLORS.primaryLight }]}>
-                <Text style={[styles.insightBadgeLabel, { color: COLORS.primary }]}>HARCAMA ORANI</Text>
-                <Text style={[styles.insightBadgeValue, { color: COLORS.primary }]}>
-                  %{insights.spendingRate} gelir kullanıldı
-                </Text>
+              <View style={[styles.summaryCard, { borderColor: COLORS.expense }]}>
+                <Text style={styles.summaryLabel}>Toplam Gider</Text>
+                <Text style={[styles.summaryValue, { color: COLORS.expense }]}>{formatCurrency(expense)}</Text>
               </View>
             </View>
 
-            {insights.unusualNote && (
-              <View style={styles.warningBox}>
-                <MaterialIcons name="warning-amber" size={16} color={COLORS.amber} />
-                <Text style={styles.warningText}>{insights.unusualNote}</Text>
+            {/* AI Insights Card */}
+            {insights && (
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <MaterialIcons name="psychology" size={24} color={COLORS.primary} />
+                  <Text style={styles.cardTitle}>Yapay Zeka Görüşleri</Text>
+                </View>
+                <Text style={styles.overallSummary}>{insights.overallSummary}</Text>
+                
+                <View style={styles.insightGrid}>
+                  <View style={styles.insightStat}>
+                    <Text style={styles.insightLabel}>LİDER KATEGORİ</Text>
+                    <Text style={styles.insightValue}>{insights.topCategory}</Text>
+                    <Text style={styles.insightSub}>{formatCurrency(insights.topCategoryAmount)}</Text>
+                  </View>
+                  <View style={styles.insightStat}>
+                    <Text style={styles.insightLabel}>GELİR KULLANIMI</Text>
+                    <Text style={styles.insightValue}>%{insights.spendingRate}</Text>
+                    <View style={styles.miniProgress}>
+                      <View style={[styles.miniProgressFill, { width: `${insights.spendingRate}%`, backgroundColor: insights.spendingRate > 80 ? COLORS.expense : COLORS.primary }]} />
+                    </View>
+                  </View>
+                </View>
+
+                {insights.unusualNote && (
+                  <View style={styles.alertBox}>
+                    <MaterialIcons name="warning-amber" size={20} color={COLORS.amber} />
+                    <Text style={styles.alertText}>{insights.unusualNote}</Text>
+                  </View>
+                )}
+
+                <View style={styles.recBox}>
+                  <MaterialIcons name="lightbulb-outline" size={20} color={COLORS.primary} />
+                  <Text style={styles.recText}>{insights.recommendation}</Text>
+                </View>
               </View>
             )}
 
-            <View style={styles.recBox}>
-              <MaterialIcons name="lightbulb-outline" size={16} color={COLORS.income} />
-              <Text style={styles.recText}>{insights.recommendation}</Text>
-            </View>
+            {!insights && !loading && (
+              <View style={styles.emptyCard}>
+                <MaterialIcons name="analytics" size={48} color={COLORS.textMuted} />
+                <Text style={styles.emptyText}>Detaylı analiz için yukarıdaki butona tıklayın.</Text>
+              </View>
+            )}
           </View>
-        )}
 
-        {/* Category Breakdown */}
-        {categoryTotals.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Kategori Dağılımı</Text>
-            {categoryTotals.map(([cat, val], i) => {
-              const pct = expense > 0 ? Math.round((val / expense) * 100) : 0;
-              return (
-                <View key={i} style={styles.catRow}>
-                  <View style={styles.catTop}>
-                    <Text style={styles.catName}>{cat}</Text>
-                    <View style={styles.catRight}>
-                      <Text style={styles.catPct}>%{pct}</Text>
-                      <Text style={styles.catVal}>{formatCurrency(val)}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.progressBg}>
-                    <View style={[styles.progressFill, { width: `${pct}%` }]} />
-                  </View>
+          <View style={styles.rightCol}>
+            {/* Category Breakdown */}
+            {categoryTotals.length > 0 && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Kategori Bazlı Harcama</Text>
+                <View style={styles.catList}>
+                  {categoryTotals.map(([cat, val], i) => {
+                    const pct = expense > 0 ? Math.round((val / expense) * 100) : 0;
+                    return (
+                      <View key={i} style={styles.catRow}>
+                        <View style={styles.catHeader}>
+                          <Text style={styles.catName}>{cat}</Text>
+                          <Text style={styles.catVal}>{formatCurrency(val)}</Text>
+                        </View>
+                        <View style={styles.progressBg}>
+                          <View style={[styles.progressFill, { width: `${pct}%` }]} />
+                        </View>
+                        <Text style={styles.catPct}>%{pct}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
-              );
-            })}
+              </View>
+            )}
           </View>
-        )}
-
-        {transactions.length === 0 && (
-          <View style={styles.empty}>
-            <MaterialIcons name="bar-chart" size={48} color={COLORS.textMuted} />
-            <Text style={styles.emptyTitle}>Veri Yok</Text>
-            <Text style={styles.emptyText}>Rapor oluşturmak için işlem eklemeniz gerekiyor.</Text>
-          </View>
-        )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: COLORS.background },
+  content: { padding: 20, paddingBottom: 40, gap: 24 },
+  webContent: { padding: 32 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  title: { fontSize: 24, fontWeight: "800", color: COLORS.textPrimary, letterSpacing: -0.5 },
+  subtitle: { fontSize: 13, color: COLORS.textMuted, marginTop: 4 },
+  analyzeBtn: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, gap: 8 },
+  analyzeBtnDisabled: { opacity: 0.7 },
+  analyzeBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  mainLayout: { gap: 24 },
+  webMainLayout: { flexDirection: "row" },
+  leftCol: { flex: 1.5, gap: 24 },
+  rightCol: { flex: 1 },
+  summaryGrid: { flexDirection: "row", gap: 16 },
+  summaryCard: { flex: 1, backgroundColor: COLORS.card, borderRadius: 16, padding: 16, borderLeftWidth: 4 },
+  summaryLabel: { fontSize: 12, color: COLORS.textSecondary, fontWeight: "600", marginBottom: 4 },
+  summaryValue: { fontSize: 18, fontWeight: "800" },
+  card: { backgroundColor: COLORS.card, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.border, gap: 20 },
+  cardHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
+  cardTitle: { fontSize: 16, fontWeight: "700", color: COLORS.textPrimary },
+  overallSummary: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 22 },
+  insightGrid: { flexDirection: "row", gap: 16 },
+  insightStat: { flex: 1, backgroundColor: COLORS.background, padding: 16, borderRadius: 12, gap: 6 },
+  insightLabel: { fontSize: 10, fontWeight: "800", color: COLORS.textMuted, letterSpacing: 0.5 },
+  insightValue: { fontSize: 15, fontWeight: "700", color: COLORS.textPrimary },
+  insightSub: { fontSize: 12, color: COLORS.textSecondary },
+  miniProgress: { height: 4, backgroundColor: COLORS.border, borderRadius: 2, marginTop: 4, overflow: "hidden" },
+  miniProgressFill: { height: 4, borderRadius: 2 },
+  alertBox: { flexDirection: "row", backgroundColor: COLORS.expenseLight, padding: 14, borderRadius: 12, gap: 12, alignItems: "center" },
+  alertText: { flex: 1, fontSize: 13, color: COLORS.expense, fontWeight: "500" },
+  recBox: { flexDirection: "row", backgroundColor: COLORS.primaryLight, padding: 14, borderRadius: 12, gap: 12, alignItems: "center" },
+  recText: { flex: 1, fontSize: 13, color: COLORS.primary, fontWeight: "500" },
+  emptyCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 40, alignItems: "center", gap: 12, borderStyle: "dashed", borderWidth: 2, borderColor: COLORS.border },
+  emptyText: { color: COLORS.textMuted, fontSize: 14, textAlign: "center" },
+  catList: { gap: 16 },
+  catRow: { gap: 8 },
+  catHeader: { flexDirection: "row", justifyContent: "space-between" },
+  catName: { fontSize: 13, fontWeight: "600", color: COLORS.textSecondary },
+  catVal: { fontSize: 13, fontWeight: "700", color: COLORS.textPrimary },
+  progressBg: { height: 6, backgroundColor: COLORS.background, borderRadius: 3, overflow: "hidden" },
+  progressFill: { height: 6, backgroundColor: COLORS.primary, borderRadius: 3 },
+  catPct: { fontSize: 11, color: COLORS.textMuted, textAlign: "right" },
+});
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
