@@ -89,6 +89,24 @@ export function useTransactions() {
   useEffect(() => {
     const fn = () => setTick((t) => t + 1);
     _listeners.push(fn);
+
+    // Background sync for family transactions
+    const sync = async () => {
+      if (!_familyId) {
+        const family = await getUserFamily();
+        if (family) {
+          _familyId = family.id;
+          subscribeToFamilyTransactions(family.id, (txs) => {
+            _familyTransactions = txs;
+            _transactions = txs;
+            saveTx();
+            notify();
+          });
+        }
+      }
+    };
+    sync();
+
     return () => {
       _listeners = _listeners.filter((l) => l !== fn);
     };
