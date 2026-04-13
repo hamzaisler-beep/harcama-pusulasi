@@ -41,28 +41,8 @@ export default function FamilyScreen() {
     fetchFamily();
   }, []);
 
-  // GHOST SEEDING - RUNS ONCE IN BACKGROUND
-  useEffect(() => {
-    const runGhostSeed = async () => {
-      if (family && !localStorage.getItem(`hp_seeded_${family.id}`)) {
-        console.log("Ghost Seeding triggered for family:", family.id);
-        try {
-          const { auth } = await import("../services/firebase");
-          if (auth.currentUser) {
-            await seedFamilyTransactions(family.id, auth.currentUser.uid, auth.currentUser.displayName || "Hamza Can");
-            localStorage.setItem(`hp_seeded_${family.id}`, "true");
-            console.log("Ghost Seeding successful!");
-          }
-        } catch (e: any) {
-          console.error("Ghost Seeding failed", e);
-          if (e.message.includes("permission")) {
-            console.warn("LÜTFEN DİKKAT: Firebase Kuralları (Rules) yazma izni vermiyor. Seeding yapılamadı.");
-          }
-        }
-      }
-    };
-    runGhostSeed();
-  }, [family]);
+  // GHOST SEEDING REMOVED - User requested to remove test data
+
 
   const fetchFamily = async () => {
     setLoading(true);
