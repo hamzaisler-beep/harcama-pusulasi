@@ -105,21 +105,21 @@ export default function DashboardScreen({ navigation }: any) {
         <View style={[styles.statRow, isWeb && styles.statRowWeb]}>
           <StatCard 
             title="Bu Ay Gelir" 
-            value={income || 65500} 
+            value={income} 
             icon="payments" 
             color={COLORS.income} 
-            change="+31% geçen ay" 
+            change="Buluttan güncellendi" 
           />
           <StatCard 
             title="Bu Ay Gider" 
-            value={expense || 7869} 
+            value={expense} 
             icon="shopping-bag" 
             color={COLORS.expense} 
-            change="+96% geçen ay" 
+            change="Buluttan güncellendi" 
           />
           <StatCard 
             title="Net Bakiye" 
-            value={balance || 57631} 
+            value={balance} 
             icon="balance" 
             color={COLORS.amber} 
             change="Olumlu" 
@@ -127,10 +127,10 @@ export default function DashboardScreen({ navigation }: any) {
           />
           <StatCard 
             title="Toplam Birikim" 
-            value={totalSavings || 177500} 
+            value={totalSavings} 
             icon="track-changes" 
             color="#a855f7" 
-            change="4 aktif hedef" 
+            change="Aktif hedefler" 
           />
         </View>
 
