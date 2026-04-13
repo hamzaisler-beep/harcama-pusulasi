@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Transaction, Saving, Account, Budget, AccountType } from "../types";
+import { Transaction, Saving, Account, Budget } from "../types";
 import { syncTransactionToCloud, subscribeToFamilyTransactions } from "../services/SharedTransactionService";
 import { getUserFamily } from "../services/familyService";
+import { auth } from "../services/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 // Safe storage helper for Web/Native compatibility
 const getStorage = () => {
@@ -22,6 +24,7 @@ const SV_KEY = "hp_savings";
 const AC_KEY = "hp_accounts";
 const BD_KEY = "hp_budgets";
 
+// Global Store State
 let _transactions: Transaction[] = [];
 let _familyTransactions: any[] = [];
 let _savings: Saving[] = [];
@@ -29,6 +32,7 @@ let _accounts: Account[] = [];
 let _budgets: Budget[] = [];
 let _familyId: string | null = null;
 let _listeners: (() => void)[] = [];
+let _isSynced = false;
 
 function notify() {
   _listeners.forEach((fn) => fn());
@@ -68,20 +72,63 @@ async function saveTx() {
   const storage = getStorage();
   if (storage) await storage.setItem(TX_KEY, JSON.stringify(_transactions));
 }
-async function saveSv() {
-  const storage = getStorage();
-  if (storage) await storage.setItem(SV_KEY, JSON.stringify(_savings));
-}
 async function saveAc() {
   const storage = getStorage();
   if (storage) await storage.setItem(AC_KEY, JSON.stringify(_accounts));
+}
+async function saveSv() {
+  const storage = getStorage();
+  if (storage) await storage.setItem(SV_KEY, JSON.stringify(_savings));
 }
 async function saveBd() {
   const storage = getStorage();
   if (storage) await storage.setItem(BD_KEY, JSON.stringify(_budgets));
 }
 
+// Initial storage load
 loadAll();
+
+/**
+ * Global Synchronization Logic
+ * Runs when auth state changes to ensure data is fetched from cloud
+ */
+const startGlobalSync = () => {
+    onAuthStateChanged(auth, async (user) => {
+        if (user && !_isSynced) {
+            console.log("Global Sync Started for user:", user.uid);
+            try {
+                const family = await getUserFamily();
+                if (family) {
+                    _familyId = family.id;
+                    console.log("Syncing with familyId:", _familyId);
+                    
+                    // Sync local to cloud once
+                    _transactions.forEach(tx => syncTransactionToCloud(tx, family.id));
+
+                    // Subscribe to real-time updates
+                    subscribeToFamilyTransactions(family.id, (txs) => {
+                        console.log("Cloud data received:", txs.length, "items");
+                        _familyTransactions = txs;
+                        // PRIMARY FIX: Update both lists so Dashboard and Transactions show data
+                        _transactions = txs;
+                        _isSynced = true;
+                        saveTx();
+                        notify();
+                    });
+                }
+            } catch (err) {
+                console.error("Global Sync Error", err);
+            }
+        } else if (!user) {
+            _isSynced = false;
+            _familyId = null;
+            _familyTransactions = [];
+        }
+    });
+};
+
+// Start sync process
+startGlobalSync();
 
 export function useTransactions() {
   const [, setTick] = useState(0);
@@ -89,24 +136,6 @@ export function useTransactions() {
   useEffect(() => {
     const fn = () => setTick((t) => t + 1);
     _listeners.push(fn);
-
-    // Background sync for family transactions
-    const sync = async () => {
-      if (!_familyId) {
-        const family = await getUserFamily();
-        if (family) {
-          _familyId = family.id;
-          subscribeToFamilyTransactions(family.id, (txs) => {
-            _familyTransactions = txs;
-            _transactions = txs;
-            saveTx();
-            notify();
-          });
-        }
-      }
-    };
-    sync();
-
     return () => {
       _listeners = _listeners.filter((l) => l !== fn);
     };
@@ -129,7 +158,6 @@ export function useTransactions() {
       _transactions = [newTx, ..._transactions];
       saveTx();
       
-      // Update account balance if accountId is present
       if (t.accountId) {
           const acc = _accounts.find(a => a.id === t.accountId);
           if (acc) {
@@ -138,7 +166,6 @@ export function useTransactions() {
           }
       }
 
-      // Cloud sync if in family
       if (_familyId) {
         syncTransactionToCloud(newTx, _familyId);
       }
@@ -174,35 +201,25 @@ export function useTransactions() {
     notify();
   }, []);
 
-  const clearAll = useCallback(async () => {
-    _transactions = [];
-    await saveTx();
-    notify();
-  }, []);
-
   return {
     transactions: _transactions,
     addTransaction,
     addTransactionsBulk,
     deleteTransaction,
-    clearAll,
+    clearAll: async () => { _transactions = []; await saveTx(); notify(); }
   };
 }
 
 export function useAccounts() {
   const [, setTick] = useState(0);
-
   useEffect(() => {
     const fn = () => setTick((t) => t + 1);
     _listeners.push(fn);
-    return () => {
-      _listeners = _listeners.filter((l) => l !== fn);
-    };
+    return () => { _listeners = _listeners.filter((l) => l !== fn); };
   }, []);
 
   const addAccount = useCallback((a: Omit<Account, "id">) => {
-    const newAc = { ...a, id: Date.now().toString(36) };
-    _accounts = [..._accounts, newAc];
+    _accounts = [..._accounts, { ...a, id: Date.now().toString(36) }];
     saveAc();
     notify();
   }, []);
@@ -218,22 +235,16 @@ export function useAccounts() {
 
 export function useBudgets() {
   const [, setTick] = useState(0);
-
   useEffect(() => {
     const fn = () => setTick((t) => t + 1);
     _listeners.push(fn);
-    return () => {
-      _listeners = _listeners.filter((l) => l !== fn);
-    };
+    return () => { _listeners = _listeners.filter((l) => l !== fn); };
   }, []);
 
   const setBudget = useCallback((b: Omit<Budget, "id">) => {
-    const existingIdx = _budgets.findIndex(x => x.category === b.category);
-    if (existingIdx > -1) {
-        _budgets[existingIdx] = { ...b, id: _budgets[existingIdx].id };
-    } else {
-        _budgets = [..._budgets, { ...b, id: Date.now().toString(36) }];
-    }
+    const idx = _budgets.findIndex(x => x.category === b.category);
+    if (idx > -1) _budgets[idx] = { ...b, id: _budgets[idx].id };
+    else _budgets = [..._budgets, { ...b, id: Date.now().toString(36) }];
     saveBd();
     notify();
   }, []);
@@ -243,22 +254,14 @@ export function useBudgets() {
 
 export function useSavings() {
   const [, setTick] = useState(0);
-
   useEffect(() => {
     const fn = () => setTick((t) => t + 1);
     _listeners.push(fn);
-    return () => {
-      _listeners = _listeners.filter((l) => l !== fn);
-    };
+    return () => { _listeners = _listeners.filter((l) => l !== fn); };
   }, []);
 
   const addSaving = useCallback((s: Omit<Saving, "id" | "createdAt">) => {
-    const newSv: Saving = {
-      ...s,
-      id: Date.now().toString(36),
-      createdAt: new Date().toISOString(),
-    };
-    _savings = [newSv, ..._savings];
+    _savings = [{ ...s, id: Date.now().toString(36), createdAt: new Date().toISOString() }, ..._savings];
     saveSv();
     notify();
   }, []);
@@ -269,44 +272,16 @@ export function useSavings() {
     notify();
   }, []);
 
-  return {
-    savings: _savings,
-    addSaving,
-    deleteSaving,
-  };
+  return { savings: _savings, addSaving, deleteSaving };
 }
 
 export function useFamilyTransactions() {
   const [, setTick] = useState(0);
-
-  const init = useCallback(async () => {
-    if (!_familyId) {
-      const family = await getUserFamily();
-      if (family) {
-        _familyId = family.id;
-        
-        // SYNC LOCAL ONCE
-        _transactions.forEach(tx => syncTransactionToCloud(tx, family.id));
-
-        subscribeToFamilyTransactions(family.id, (txs) => {
-          _familyTransactions = txs;
-          // Hydrate the main transaction list with family data
-          _transactions = txs;
-          saveTx(); 
-          notify();
-        });
-      }
-    }
-  }, []);
-
   useEffect(() => {
     const fn = () => setTick((t) => t + 1);
     _listeners.push(fn);
-    init();
-    return () => {
-      _listeners = _listeners.filter((l) => l !== fn);
-    };
-  }, [init]);
+    return () => { _listeners = _listeners.filter((l) => l !== fn); };
+  }, []);
 
   return {
     familyId: _familyId,
