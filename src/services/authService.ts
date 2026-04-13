@@ -4,6 +4,8 @@ import {
   createUserWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
+  sendPasswordResetEmail,
+  confirmPasswordReset,
   updateProfile,
   User
 } from "firebase/auth";
@@ -12,6 +14,14 @@ import { auth, db } from "./firebase";
 
 export const login = (email: string, pass: string) => {
   return signInWithEmailAndPassword(auth, email, pass);
+};
+
+export const resetPassword = (email: string) => {
+  return sendPasswordResetEmail(auth, email);
+};
+
+export const completePasswordReset = (code: string, newPass: string) => {
+  return confirmPasswordReset(auth, code, newPass);
 };
 
 export const register = async (name: string, email: string, pass: string) => {

@@ -22,18 +22,20 @@ export default function RegisterScreen({ navigation }: any) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const handleRegister = async () => {
     if (!name || !email || !password) {
-      Alert.alert("Hata", "Lütfen tüm alanları doldurun.");
+      setErrorMessage("Lütfen tüm alanları doldurun.");
       return;
     }
     if (password.length < 6) {
-      Alert.alert("Hata", "Şifre en az 6 karakter olmalıdır.");
+      setErrorMessage("Şifre en az 6 karakter olmalıdır.");
       return;
     }
 
     setLoading(true);
+    setErrorMessage("");
     try {
       await register(name, email, password);
       // Auth state change will handle navigation
@@ -41,8 +43,11 @@ export default function RegisterScreen({ navigation }: any) {
       console.error("Register error", error);
       let msg = "Kayıt işlemi başarısız. Lütfen tekrar deneyin.";
       if (error.code === "auth/email-already-in-use") msg = "Bu e-posta zaten kullanımda.";
-      if (error.code === "auth/invalid-email") msg = "Geçersiz e-posta adresi.";
-      Alert.alert("Kayıt Hatası", msg);
+      else if (error.code === "auth/invalid-email") msg = "Geçersiz e-posta adresi.";
+      else if (error.code === "auth/weak-password") msg = "Şifre çok zayıf.";
+      else if (error.code === "auth/network-request-failed") msg = "İnternet bağlantınızı kontrol edin.";
+      
+      setErrorMessage(msg);
     } finally {
       setLoading(false);
     }
@@ -67,26 +72,32 @@ export default function RegisterScreen({ navigation }: any) {
           <View style={styles.form}>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Ad Soyad</Text>
-              <View style={styles.inputWrapper}>
+              <View style={[styles.inputWrapper, errorMessage && !name ? styles.inputError : null]}>
                 <MaterialIcons name="person" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="John Doe"
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={(text) => {
+                    setName(text);
+                    if (errorMessage) setErrorMessage("");
+                  }}
                 />
               </View>
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>E-posta</Text>
-              <View style={styles.inputWrapper}>
+              <View style={[styles.inputWrapper, errorMessage && !email ? styles.inputError : null]}>
                 <MaterialIcons name="email" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="ornek@mail.com"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    if (errorMessage) setErrorMessage("");
+                  }}
                   autoCapitalize="none"
                   keyboardType="email-address"
                 />
@@ -95,17 +106,27 @@ export default function RegisterScreen({ navigation }: any) {
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Şifre</Text>
-              <View style={styles.inputWrapper}>
+              <View style={[styles.inputWrapper, errorMessage && !password ? styles.inputError : null]}>
                 <MaterialIcons name="lock" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="••••••••"
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (errorMessage) setErrorMessage("");
+                  }}
                   secureTextEntry
                 />
               </View>
             </View>
+
+            {errorMessage ? (
+              <View style={styles.errorContainer}>
+                <MaterialIcons name="error-outline" size={18} color={COLORS.expense} />
+                <Text style={styles.errorText}>{errorMessage}</Text>
+              </View>
+            ) : null}
 
             <TouchableOpacity
               style={[styles.registerBtn, loading && styles.registerBtnDisabled]}
@@ -140,7 +161,7 @@ const styles = StyleSheet.create({
   header: { marginBottom: 32 },
   title: { fontSize: 28, fontWeight: "800", color: COLORS.textPrimary, marginBottom: 8 },
   subtitle: { fontSize: 16, color: COLORS.textSecondary },
-  form: { gap: 20 },
+  form: { gap: 16 },
   inputGroup: { gap: 8 },
   label: { fontSize: 14, fontWeight: "600", color: COLORS.textPrimary, marginLeft: 4 },
   inputWrapper: {
@@ -152,14 +173,32 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     paddingHorizontal: 12,
   },
+  inputError: {
+    borderColor: COLORS.expense,
+  },
   inputIcon: { marginRight: 8 },
   input: { flex: 1, paddingVertical: 14, fontSize: 16, color: COLORS.textPrimary },
+  errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.expenseLight,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.expense,
+  },
+  errorText: {
+    color: COLORS.expense,
+    fontSize: 14,
+    marginLeft: 8,
+    fontWeight: "500",
+  },
   registerBtn: {
     backgroundColor: COLORS.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: "center",
-    marginTop: 12,
+    marginTop: 8,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,

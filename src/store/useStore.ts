@@ -266,9 +266,15 @@ export function useFamilyTransactions() {
       const family = await getUserFamily();
       if (family) {
         _familyId = family.id;
+        
+        // SYNC LOCAL ONCE
         _transactions.forEach(tx => syncTransactionToCloud(tx, family.id));
+
         subscribeToFamilyTransactions(family.id, (txs) => {
           _familyTransactions = txs;
+          // Hydrate the main transaction list with family data
+          _transactions = txs;
+          saveTx(); 
           notify();
         });
       }
