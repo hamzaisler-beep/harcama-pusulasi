@@ -30,20 +30,31 @@ export default function DashboardScreen({ navigation }: any) {
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
 
-  const { income, expense, balance } = useMemo(() => {
+  const { monthIncome, monthExpense, totalBalance } = useMemo(() => {
     const monthTxs = transactions.filter(t => {
         const d = new Date(t.date);
         return isWithinInterval(d, { start: monthStart, end: monthEnd });
     });
 
-    const inc = monthTxs
+    const mInc = monthTxs
       .filter((t) => t.type === "income")
       .reduce((s, t) => s + Number(t.amount || 0), 0);
-    const exp = monthTxs
+    const mExp = monthTxs
       .filter((t) => t.type === "expense")
       .reduce((s, t) => s + Math.abs(Number(t.amount || 0)), 0);
     
-    return { income: inc, expense: exp, balance: inc - exp };
+    const totalInc = transactions
+      .filter((t) => t.type === "income")
+      .reduce((s, t) => s + Number(t.amount || 0), 0);
+    const totalExp = transactions
+      .filter((t) => t.type === "expense")
+      .reduce((s, t) => s + Math.abs(Number(t.amount || 0)), 0);
+
+    return { 
+      monthIncome: mInc, 
+      monthExpense: mExp, 
+      totalBalance: totalInc - totalExp 
+    };
   }, [transactions]);
 
   const totalSavings = useMemo(() => {
@@ -147,30 +158,37 @@ export default function DashboardScreen({ navigation }: any) {
             </View>
         </View>
 
+        {/* Main Balance Card */}
+        <View style={styles.mainCard}>
+          <Text style={styles.mainCardLabel}>GÜNCEL TOPLAM BAKİYE</Text>
+          <Text style={styles.mainCardValue}>{formatCurrency(totalBalance)}</Text>
+          
+          <View style={styles.divider} />
+          
+          <View style={styles.miniStatsRow}>
+            <View style={styles.miniStat}>
+              <View style={[styles.miniIcon, { backgroundColor: COLORS.income + "20" }]}>
+                <MaterialIcons name="trending-up" size={12} color={COLORS.income} />
+              </View>
+              <View>
+                <Text style={styles.miniLabel}>Bu Ay Gelir</Text>
+                <Text style={[styles.miniValue, { color: COLORS.income }]}>{formatCurrency(monthIncome)}</Text>
+              </View>
+            </View>
+            <View style={styles.miniStat}>
+              <View style={[styles.miniIcon, { backgroundColor: COLORS.expense + "20" }]}>
+                <MaterialIcons name="trending-down" size={12} color={COLORS.expense} />
+              </View>
+              <View>
+                <Text style={styles.miniLabel}>Bu Ay Gider</Text>
+                <Text style={[styles.miniValue, { color: COLORS.expense }]}>{formatCurrency(monthExpense)}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
         {/* Top Stats Row */}
         <View style={[styles.statRow, isWeb && styles.statRowWeb]}>
-          <StatCard 
-            title="Bu Ay Gelir" 
-            value={income} 
-            icon="payments" 
-            color={COLORS.income} 
-            change="Buluttan güncellendi" 
-          />
-          <StatCard 
-            title="Bu Ay Gider" 
-            value={expense} 
-            icon="shopping-bag" 
-            color={COLORS.expense} 
-            change="Buluttan güncellendi" 
-          />
-          <StatCard 
-            title="Net Bakiye" 
-            value={balance} 
-            icon="balance" 
-            color={COLORS.amber} 
-            change="Olumlu" 
-            isBalance 
-          />
           <StatCard 
             title="Toplam Birikim" 
             value={totalSavings} 
