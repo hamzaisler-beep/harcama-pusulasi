@@ -97,24 +97,27 @@ export const joinFamily = async (invitationCode: string) => {
 
 export const getUserFamily = async () => {
   if (!auth.currentUser) return null;
+  const uid = auth.currentUser.uid;
   
-  const userRef = doc(db, "users", auth.currentUser.uid);
+  // Try 1: Via user document
+  const userRef = doc(db, "users", uid);
   const userSnap = await getDoc(userRef);
   
   if (userSnap.exists() && userSnap.data().familyId) {
     const familyRef = doc(db, "familyGroups", userSnap.data().familyId);
     const familySnap = await getDoc(familyRef);
     if (familySnap.exists()) {
-      const data = familySnap.data();
-      return { 
-        id: familySnap.id, 
-        name: data.name,
-        invitationCode: data.invitationCode,
-        members: data.members || [],
-        ownerId: data.ownerId,
-        createdAt: data.createdAt
-      } as Family;
+      return { id: familySnap.id, ...familySnap.data() } as Family;
     }
   }
+
+  // Try 2: Generic search in members array (Fallback)
+  const q = query(collection(db, "familyGroups"), where("members", "array-contains", uid));
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    const d = snap.docs[0];
+    return { id: d.id, ...d.data() } as Family;
+  }
+  
   return null;
 };

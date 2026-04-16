@@ -78,6 +78,7 @@ async function loadLocalMeta() {
 
 // THE CENTRAL SYNC ENGINE
 async function initCloudSync(user: any) {
+    console.log("🔄 initCloudSync called for user:", user?.uid);
     if (!user) {
         _unsubs.forEach(u => u());
         _unsubs = [];
@@ -89,13 +90,16 @@ async function initCloudSync(user: any) {
 
     try {
         const family = await getUserFamily();
+        console.log("🔍 Found family:", family?.id);
         if (family && (!_isSubscribed || _familyId !== family.id)) {
+            console.log("☁️ Subscribing to cloud family:", family.id);
             _unsubs.forEach(u => u());
             _unsubs = [];
             _familyId = family.id;
             _isSubscribed = true;
             
             _unsubs.push(subscribeToFamilyTransactions(family.id, (txs) => {
+                console.log("✅ Transactions updated:", txs.length);
                 _transactions = txs;
                 const storage = getStorage();
                 if (storage) storage.setItem(TX_KEY, JSON.stringify(_transactions));
