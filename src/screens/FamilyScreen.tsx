@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
+import { auth } from "../services/firebase";
 import { LineChart } from "react-native-chart-kit";
 import { COLORS } from "../types";
 import { createFamily, joinFamily, getUserFamily, Family } from "../services/familyService";
@@ -276,6 +277,29 @@ export default function FamilyScreen() {
             </View>
           ))}
           {familyTransactions.length === 0 && <Text style={styles.emptyText}>Henüz işlem yok.</Text>}
+        </View>
+
+        {/* Temporary Setup Button for Indexing */}
+        <View style={[styles.card, { marginTop: 24, borderStyle: 'dashed', borderWidth: 2, borderColor: COLORS.primary }]}>
+          <Text style={styles.cardTitle}>Sistem Kurulumu (PC/Web Sync İçin)</Text>
+          <Text style={styles.emptyText}>Bu buton sadece bir kez kullanılmalıdır. Firestore üzerinde gerekli endekslerin oluşması için örnek verileri yükler.</Text>
+          <TouchableOpacity 
+            style={[styles.submitBtn, { marginTop: 16 }]} 
+            onPress={async () => {
+              if (!family) return;
+              setActionLoading(true);
+              try {
+                await seedFamilyTransactions(family.id, auth.currentUser!.uid, auth.currentUser!.displayName || "Kullanıcı");
+                Alert.alert("Başarılı", "Örnek veriler yüklendi. Şimdi F12 konsolundaki endeks linklerini kontrol edebilirsiniz.");
+              } catch (e: any) {
+                Alert.alert("Hata", e.message);
+              } finally {
+                setActionLoading(false);
+              }
+            }}
+          >
+            <Text style={styles.submitBtnText}>Veri Yapılarını Buluta Senkronize Et</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>

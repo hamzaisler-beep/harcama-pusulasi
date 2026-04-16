@@ -28,10 +28,12 @@ export async function fetchMarketRates(): Promise<MarketRate> {
   try {
     // Fetch Gold Price
     const goldRes = await fetch(`${BASE_URL}/goldPrice`, { headers });
+    if (!goldRes.ok) throw new Error(`API Error (Gold): ${goldRes.status}`);
     const goldData = await goldRes.json();
     
     // Fetch All Currency
     const curRes = await fetch(`${BASE_URL}/allCurrency`, { headers });
+    if (!curRes.ok) throw new Error(`API Error (Currency): ${curRes.status}`);
     const curData = await curRes.json();
 
     if (!goldData.success || !curData.success) {
