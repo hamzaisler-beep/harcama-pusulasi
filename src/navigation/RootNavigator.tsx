@@ -1,30 +1,35 @@
 // src/navigation/RootNavigator.tsx
-import React from "react";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
-import { useAuth } from "../store/useAuthStore";
-import AppNavigator from "./AppNavigator";
-import AuthNavigator from "./AuthNavigator";
-import { COLORS } from "../types";
+import React, { useState, useEffect } from "react";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../services/firebase";
+
+import LoginScreen from "../screens/LoginScreen";
+import DashboardScreen from "../screens/DashboardScreen";
+
+const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
-  const { user, loading, initialized } = useAuth();
+  const [user, setUser] = useState<any>(null);
+  const [initializing, setInitializing] = useState(true);
 
-  if (!initialized || loading) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setInitializing(false);
+    });
+    return unsub;
+  }, []);
 
-  return user ? <AppNavigator /> : <AuthNavigator />;
+  if (initializing) return null;
+
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {!user ? (
+        <Stack.Screen name="Login" component={LoginScreen} />
+      ) : (
+        <Stack.Screen name="Dashboard" component={DashboardScreen} />
+      )}
+    </Stack.Navigator>
+  );
 }
-
-const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: COLORS.background,
-  },
-});
