@@ -4,8 +4,6 @@ import {
   query, 
   where, 
   onSnapshot, 
-  orderBy,
-  limit,
   Timestamp,
   doc,
   setDoc,
@@ -33,15 +31,16 @@ export const syncTransactionToCloud = async (tx: Transaction, familyId: string) 
 
 export const subscribeToFamilyTransactions = (familyId: string, callback: (txs: Transaction[]) => void) => {
   if (!familyId) return () => {};
+  // REMOVED orderBy to avoid Firebase Index requirement. Sorting is done on client.
   const q = query(
     collection(db, "transactions"),
-    where("familyId", "==", familyId),
-    orderBy("date", "desc"),
-    limit(500)
+    where("familyId", "==", familyId)
   );
   return onSnapshot(q, (snapshot) => {
     const txs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Transaction);
-    callback(txs);
+    // Client-side sort: Newest first
+    txs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    callback(txs.slice(0, 500));
   });
 };
 
@@ -74,9 +73,11 @@ export const syncSavingToCloud = async (sav: Saving, familyId: string) => {
 
 export const subscribeToFamilySavings = (familyId: string, callback: (savs: Saving[]) => void) => {
   if (!familyId) return () => {};
-  const q = query(collection(db, "savings"), where("familyId", "==", familyId), orderBy("createdAt", "desc"));
+  // REMOVED orderBy to avoid Firebase Index requirement.
+  const q = query(collection(db, "savings"), where("familyId", "==", familyId));
   return onSnapshot(q, (snapshot) => {
     const savs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Saving);
+    savs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     callback(savs);
   });
 };
