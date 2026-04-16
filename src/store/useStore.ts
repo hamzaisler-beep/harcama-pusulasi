@@ -57,9 +57,11 @@ async function loadLocalMeta() {
   try {
     const storage = getStorage();
     if (!storage) return;
+    const txRaw = await storage.getItem(TX_KEY);
     const svRaw = await storage.getItem(SV_KEY);
     const acRaw = await storage.getItem(AC_KEY);
     const bdRaw = await storage.getItem(BD_KEY);
+    _transactions = txRaw ? JSON.parse(txRaw) : [];
     _savings = svRaw ? JSON.parse(svRaw) : [];
     _accounts = acRaw ? JSON.parse(acRaw) : [];
     _budgets = bdRaw ? JSON.parse(bdRaw) : [];
@@ -68,7 +70,6 @@ async function loadLocalMeta() {
         _accounts = [
             { id: "acc1", name: "Nakit", type: "CASH", balance: 1200, color: "#22c55e" },
             { id: "acc2", name: "Banka", type: "BANK", balance: 45000, color: "#3b82f6" },
-            { id: "acc3", name: "Kredi Kartı", type: "CARD", balance: -5400, color: "#f43f5e" },
         ];
     }
     notify();
@@ -82,10 +83,6 @@ async function initCloudSync(user: any) {
         _unsubs = [];
         _isSubscribed = false;
         _familyId = null;
-        _transactions = [];
-        _savings = [];
-        _accounts = [];
-        _budgets = [];
         notify();
         return;
     }
@@ -98,29 +95,33 @@ async function initCloudSync(user: any) {
             _familyId = family.id;
             _isSubscribed = true;
             
-            // TRANSACTIONS
             _unsubs.push(subscribeToFamilyTransactions(family.id, (txs) => {
                 _transactions = txs;
+                const storage = getStorage();
+                if (storage) storage.setItem(TX_KEY, JSON.stringify(_transactions));
                 notify();
             }));
 
-            // ACCOUNTS
             _unsubs.push(subscribeToFamilyAccounts(family.id, (accs) => {
                 if (accs.length > 0) {
                     _accounts = accs;
+                    const storage = getStorage();
+                    if (storage) storage.setItem(AC_KEY, JSON.stringify(_accounts));
                     notify();
                 }
             }));
-
-            // SAVINGS
+            
             _unsubs.push(subscribeToFamilySavings(family.id, (savs) => {
                 _savings = savs;
+                const storage = getStorage();
+                if (storage) storage.setItem(SV_KEY, JSON.stringify(_savings));
                 notify();
             }));
 
-            // BUDGETS
             _unsubs.push(subscribeToFamilyBudgets(family.id, (buds) => {
                 _budgets = buds;
+                const storage = getStorage();
+                if (storage) storage.setItem(BD_KEY, JSON.stringify(_budgets));
                 notify();
             }));
         }
@@ -149,6 +150,8 @@ export function useTransactions() {
     addTransaction: (t: any, isManual = true) => {
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2,4);
       const newTx = { ...t, id, isManualEntry: isManual };
+      _transactions = [newTx, ..._transactions];
+      notify();
       if (_familyId) syncTransactionToCloud(newTx, _familyId);
       return true;
     },
@@ -161,7 +164,9 @@ export function useTransactions() {
       return txs.length;
     },
     deleteTransaction: (id: string) => {
-       deleteCloudDoc("transactions", id);
+       _transactions = _transactions.filter(t => t.id !== id);
+       notify();
+       if (_familyId) deleteCloudDoc("transactions", id);
     },
     clearAll: async () => { _transactions.forEach(t => deleteCloudDoc("transactions", t.id)); }
   };
@@ -178,12 +183,14 @@ export function useAccounts() {
     accounts: _accounts, 
     addAccount: (a:any)=>{
       const newAcc = {...a, id: a.id || Date.now().toString(36)};
+      _accounts = [..._accounts, newAcc];
+      notify();
       if (_familyId) syncAccountToCloud(newAcc, _familyId);
-      else { _accounts = [..._accounts, newAcc]; notify(); }
     }, 
     deleteAccount: (id:string)=>{
+      _accounts = _accounts.filter(a=>a.id!==id);
+      notify();
       if (_familyId) deleteCloudDoc("accounts", id);
-      else { _accounts = _accounts.filter(a=>a.id!==id); notify(); }
     } 
   };
 }
@@ -200,13 +207,11 @@ export function useBudgets() {
     setBudget: (b:any)=>{
       const id = b.id || Date.now().toString(36);
       const newBud = {...b, id};
+      const idx=_budgets.findIndex(x=>x.category===b.category); 
+      if(idx>-1) _budgets[idx]=newBud; 
+      else _budgets=[..._budgets, newBud]; 
+      notify();
       if (_familyId) syncBudgetToCloud(newBud, _familyId);
-      else {
-          const idx=_budgets.findIndex(x=>x.category===b.category); 
-          if(idx>-1) _budgets[idx]=newBud; 
-          else _budgets=[..._budgets, newBud]; 
-          notify();
-      }
     } 
   };
 }
@@ -222,12 +227,14 @@ export function useSavings() {
     savings: _savings, 
     addSaving: (s:any)=>{
       const newSav = {...s, id: Date.now().toString(36), createdAt: new Date().toISOString()};
+      _savings = [newSav, ..._savings];
+      notify();
       if (_familyId) syncSavingToCloud(newSav, _familyId);
-      else { _savings = [newSav, ..._savings]; notify(); }
     }, 
     deleteSaving: (id:string)=>{
+      _savings = _savings.filter(s=>s.id!==id);
+      notify();
       if (_familyId) deleteCloudDoc("savings", id);
-      else { _savings = _savings.filter(s=>s.id!==id); notify(); }
     }
   };
 }
