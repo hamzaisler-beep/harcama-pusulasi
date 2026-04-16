@@ -26,13 +26,13 @@ export default function ComingSoonScreen({ route }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.background },
+  safe: { flex: 1, backgroundColor: "#000" },
   container: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40 },
   iconCircle: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: COLORS.card,
+    backgroundColor: "#111",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,
@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "900",
-    color: COLORS.textPrimary,
+    color: "#fff",
     textAlign: "center",
     marginBottom: 12,
   },

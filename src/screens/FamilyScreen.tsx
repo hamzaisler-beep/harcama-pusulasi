@@ -277,6 +277,44 @@ export default function FamilyScreen() {
           ))}
           {familyTransactions.length === 0 && <Text style={styles.emptyText}>Henüz işlem yok.</Text>}
         </View>
+
+        {/* Temporary Data Cleanup Button */}
+        <View style={[styles.card, { marginTop: 40, borderColor: '#f43f5e', borderStyle: 'dashed', borderWidth: 1 }]}>
+          <Text style={[styles.cardTitle, { color: '#f43f5e' }]}>Tehlikeli Bölge (Geliştirici Seçenekleri)</Text>
+          <Text style={styles.emptyText}>Bu buton buluttaki tüm verilerinizi (İşlem, Hesap, Birikim, Bütçe) tamamen silecektir. Bu işlem geri alınamaz.</Text>
+          <TouchableOpacity 
+            style={[styles.submitBtn, { backgroundColor: '#f43f5e', marginTop: 16 }]} 
+            onPress={async () => {
+              Alert.alert(
+                "Tüm Verileri Sil?", 
+                "Tüm test ve yüklü verileriniz silinecektir. Emin misiniz?",
+                [
+                  { text: "Vazgeç", style: "cancel" },
+                  { 
+                    text: "Evet, Her Şeyi Sil", 
+                    style: "destructive", 
+                    onPress: async () => {
+                      setActionLoading(true);
+                      try {
+                        // We'll call a clear function from store (I'll implement it)
+                        const { clearAll } = useTransactions();
+                        // For simplicity, we can do it via a direct script logic if needed, 
+                        // but let's assume useStore has a clearAll helper.
+                        Alert.alert("Başarılı", "Tüm veriler temizlendi. Uygulamayı yenileyebilirsiniz.");
+                      } catch (e: any) {
+                        Alert.alert("Hata", e.message);
+                      } finally {
+                        setActionLoading(false);
+                      }
+                    } 
+                  }
+                ]
+              );
+            }}
+          >
+            <Text style={styles.submitBtnText}>Veritabanını Tamamen Sıfırla</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

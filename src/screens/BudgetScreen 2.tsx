@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   useWindowDimensions,
-  ActivityIndicator,
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,20 +16,12 @@ import { COLORS, CATEGORIES } from "../types";
 import { formatCurrency } from "../utils/format";
 
 export default function BudgetScreen() {
-  const { transactions, isLoaded } = useTransactions();
+  const { transactions } = useTransactions();
   const { budgets, setBudget } = useBudgets();
   const [selectedCat, setSelectedCat] = useState(CATEGORIES[0]);
   const [limit, setLimit] = useState("");
   const { width } = useWindowDimensions();
   const isWeb = width > 1024;
-
-  if (!isLoaded) {
-    return (
-        <View style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
-    );
-  }
 
   const currentMonthExpenses = transactions.filter(t => t.type === "expense");
 
@@ -134,8 +125,8 @@ export default function BudgetScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.background, minHeight: '100%' },
-  content: { padding: 20, gap: 24, paddingBottom: 40, flexGrow: 1 },
+  safe: { flex: 1, backgroundColor: "#000" },
+  content: { padding: 20, gap: 24, paddingBottom: 40 },
   webContent: { padding: 32 },
   header: { marginBottom: 8 },
   title: { fontSize: 24, fontWeight: "900", color: "#fff" },
@@ -147,33 +138,33 @@ const styles = StyleSheet.create({
   budgetList: { gap: 24 },
   budgetRow: { gap: 12 },
   budgetInfo: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  catName: { color: COLORS.textPrimary, fontSize: 15, fontWeight: "700" },
+  catName: { color: "#fff", fontSize: 15, fontWeight: "700" },
   spentText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "600" },
   progressContainer: { flexDirection: "row", alignItems: "center", gap: 12 },
   progressBg: { flex: 1, height: 8, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 4, overflow: "hidden" },
   progressFill: { height: "100%", borderRadius: 4 },
   pctText: { color: COLORS.textMuted, fontSize: 11, fontWeight: "700", width: 30 },
   card: {
-    backgroundColor: COLORS.card,
+    backgroundColor: "#111",
     padding: 24,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.05)",
     gap: 20,
   },
-  cardTitle: { color: COLORS.textPrimary, fontSize: 16, fontWeight: "800", marginBottom: 8 },
+  cardTitle: { color: "#fff", fontSize: 16, fontWeight: "800", marginBottom: 8 },
   inputGroup: { gap: 10 },
   label: { color: COLORS.textSecondary, fontSize: 12, fontWeight: "600" },
   catScroll: { paddingVertical: 4 },
-  catChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: COLORS.background, marginRight: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
+  catChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: "#000", marginRight: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
   catChipActive: { backgroundColor: "rgba(34, 197, 94, 0.1)", borderColor: COLORS.primary },
   catChipText: { color: COLORS.textMuted, fontSize: 12, fontWeight: "600" },
   catChipTextActive: { color: COLORS.primary },
   input: {
-    backgroundColor: COLORS.background,
+    backgroundColor: "#000",
     borderRadius: 12,
     padding: 14,
-    color: COLORS.textPrimary,
+    color: "#fff",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
@@ -184,5 +175,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
   },
-  addBtnText: { color: COLORS.textPrimary, fontWeight: "800", fontSize: 14 },
+  addBtnText: { color: "#fff", fontWeight: "800", fontSize: 14 },
 });

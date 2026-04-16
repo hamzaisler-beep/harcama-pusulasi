@@ -45,6 +45,7 @@ let _savings: Saving[] = [];
 let _accounts: Account[] = [];
 let _budgets: Budget[] = [];
 let _familyId: string | null = null;
+let _currentActiveId: string | null = null;
 let _listeners: (() => void)[] = [];
 let _isSubscribed = false;
 let _unsubs: (() => void)[] = [];
@@ -89,16 +90,24 @@ async function initCloudSync(user: any) {
     }
 
     try {
-        const family = await getUserFamily();
-        console.log("🔍 Found family:", family?.id);
-        if (family && (!_isSubscribed || _familyId !== family.id)) {
-            console.log("☁️ Subscribing to cloud family:", family.id);
+        let family = await getUserFamily();
+        
+        // If no family, use personal UID as a "Personal Family" to enable cross-device sync
+        if (!family) {
+            console.log("👤 No family found, using Personal Space sync");
+            _familyId = `personal_${user.uid}`;
+        } else {
+            _familyId = family.id;
+        }
+
+        if (_familyId && (!_isSubscribed || _currentActiveId !== _familyId)) {
+            console.log("☁️ Subscribing to cloud space:", _familyId);
             _unsubs.forEach(u => u());
             _unsubs = [];
-            _familyId = family.id;
+            _currentActiveId = _familyId;
             _isSubscribed = true;
             
-            _unsubs.push(subscribeToFamilyTransactions(family.id, (txs) => {
+            _unsubs.push(subscribeToFamilyTransactions(_familyId, (txs) => {
                 console.log("✅ Transactions updated:", txs.length);
                 _transactions = txs;
                 const storage = getStorage();
@@ -106,7 +115,7 @@ async function initCloudSync(user: any) {
                 notify();
             }));
 
-            _unsubs.push(subscribeToFamilyAccounts(family.id, (accs) => {
+            _unsubs.push(subscribeToFamilyAccounts(_familyId, (accs) => {
                 if (accs.length > 0) {
                     _accounts = accs;
                     const storage = getStorage();
@@ -115,14 +124,14 @@ async function initCloudSync(user: any) {
                 }
             }));
             
-            _unsubs.push(subscribeToFamilySavings(family.id, (savs) => {
+            _unsubs.push(subscribeToFamilySavings(_familyId, (savs) => {
                 _savings = savs;
                 const storage = getStorage();
                 if (storage) storage.setItem(SV_KEY, JSON.stringify(_savings));
                 notify();
             }));
 
-            _unsubs.push(subscribeToFamilyBudgets(family.id, (buds) => {
+            _unsubs.push(subscribeToFamilyBudgets(_familyId, (buds) => {
                 _budgets = buds;
                 const storage = getStorage();
                 if (storage) storage.setItem(BD_KEY, JSON.stringify(_budgets));
@@ -172,7 +181,14 @@ export function useTransactions() {
        notify();
        if (_familyId) deleteCloudDoc("transactions", id);
     },
-    clearAll: async () => { _transactions.forEach(t => deleteCloudDoc("transactions", t.id)); }
+    clearAll: async () => { 
+      _transactions.forEach(t => deleteCloudDoc("transactions", t.id));
+      _accounts.forEach(a => deleteCloudDoc("accounts", a.id));
+      _savings.forEach(s => deleteCloudDoc("savings", s.id));
+      _budgets.forEach(b => deleteCloudDoc("budgets", b.id));
+      _transactions=[]; _accounts=[]; _savings=[]; _budgets=[];
+      notify();
+    }
   };
 }
 
