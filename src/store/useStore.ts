@@ -1,7 +1,18 @@
-import { useState, useEffect, useCallback } from "react";
+// src/store/useStore.ts
+import { useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Transaction, Saving, Account, Budget } from "../types";
-import { syncTransactionToCloud, subscribeToFamilyTransactions } from "../services/SharedTransactionService";
+import { 
+  syncTransactionToCloud, 
+  subscribeToFamilyTransactions,
+  syncAccountToCloud,
+  subscribeToFamilyAccounts,
+  syncSavingToCloud,
+  subscribeToFamilySavings,
+  syncBudgetToCloud,
+  subscribeToFamilyBudgets,
+  deleteCloudDoc
+} from "../services/SharedTransactionService";
 import { getUserFamily } from "../services/familyService";
 import { auth } from "../services/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -28,7 +39,7 @@ const SV_KEY = "hp_savings";
 const AC_KEY = "hp_accounts";
 const BD_KEY = "hp_budgets";
 
-// GLOBAL STATE - EVERYTHING POINTS TO THE FAMILY CLOUD POOL
+// GLOBAL STATE
 let _transactions: Transaction[] = []; 
 let _savings: Saving[] = [];
 let _accounts: Account[] = [];
@@ -36,6 +47,7 @@ let _budgets: Budget[] = [];
 let _familyId: string | null = null;
 let _listeners: (() => void)[] = [];
 let _isSubscribed = false;
+let _unsubs: (() => void)[] = [];
 
 function notify() {
   _listeners.forEach((fn) => fn());
@@ -63,42 +75,54 @@ async function loadLocalMeta() {
   } catch (e) {}
 }
 
-async function saveLocalMeta() {
-  const storage = getStorage();
-  if (storage) {
-    await storage.setItem(SV_KEY, JSON.stringify(_savings));
-    await storage.setItem(AC_KEY, JSON.stringify(_accounts));
-    await storage.setItem(BD_KEY, JSON.stringify(_budgets));
-  }
-}
-
 // THE CENTRAL SYNC ENGINE
 async function initCloudSync(user: any) {
     if (!user) {
+        _unsubs.forEach(u => u());
+        _unsubs = [];
         _isSubscribed = false;
         _familyId = null;
         _transactions = [];
+        _savings = [];
+        _accounts = [];
+        _budgets = [];
         notify();
         return;
     }
 
     try {
-        console.log("Syncing for user:", user.uid);
         const family = await getUserFamily();
         if (family && (!_isSubscribed || _familyId !== family.id)) {
+            _unsubs.forEach(u => u());
+            _unsubs = [];
             _familyId = family.id;
             _isSubscribed = true;
             
-            // Overwrite EVERYTHING with Family Cloud Data
-            subscribeToFamilyTransactions(family.id, (cloudTxs) => {
-                console.log("Cloud Pool Sync:", cloudTxs.length, "transactions found.");
-                _transactions = cloudTxs;
+            // TRANSACTIONS
+            _unsubs.push(subscribeToFamilyTransactions(family.id, (txs) => {
+                _transactions = txs;
                 notify();
-                
-                // Keep a local copy for offline view
-                const storage = getStorage();
-                if (storage) storage.setItem(TX_KEY, JSON.stringify(_transactions));
-            });
+            }));
+
+            // ACCOUNTS
+            _unsubs.push(subscribeToFamilyAccounts(family.id, (accs) => {
+                if (accs.length > 0) {
+                    _accounts = accs;
+                    notify();
+                }
+            }));
+
+            // SAVINGS
+            _unsubs.push(subscribeToFamilySavings(family.id, (savs) => {
+                _savings = savs;
+                notify();
+            }));
+
+            // BUDGETS
+            _unsubs.push(subscribeToFamilyBudgets(family.id, (buds) => {
+                _budgets = buds;
+                notify();
+            }));
         }
     } catch (e) {
         console.error("Cloud sync init error", e);
@@ -116,12 +140,7 @@ export function useTransactions() {
   useEffect(() => {
     const fn = () => setTick((t) => t + 1);
     _listeners.push(fn);
-    
-    // Safety check: if we have user but no family sync yet, try again
-    if (auth.currentUser && !_isSubscribed) {
-        initCloudSync(auth.currentUser);
-    }
-    
+    if (auth.currentUser && !_isSubscribed) initCloudSync(auth.currentUser);
     return () => { _listeners = _listeners.filter((l) => l !== fn); };
   }, []);
 
@@ -130,19 +149,7 @@ export function useTransactions() {
     addTransaction: (t: any, isManual = true) => {
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2,4);
       const newTx = { ...t, id, isManualEntry: isManual };
-      
-      // OPTIMISTIC UPDATE
-      _transactions = [newTx, ..._transactions];
-      notify();
-
-      // PUSH TO CLOUD POOL IMMEDIATELY
-      if (_familyId) {
-          syncTransactionToCloud(newTx, _familyId);
-      } else {
-          // If not in family, still save locally
-          const storage = getStorage();
-          if (storage) storage.setItem(TX_KEY, JSON.stringify(_transactions));
-      }
+      if (_familyId) syncTransactionToCloud(newTx, _familyId);
       return true;
     },
     addTransactionsBulk: (txs: any[]) => {
@@ -154,10 +161,9 @@ export function useTransactions() {
       return txs.length;
     },
     deleteTransaction: (id: string) => {
-       _transactions = _transactions.filter(t => t.id !== id);
-       notify();
+       deleteCloudDoc("transactions", id);
     },
-    clearAll: async () => { _transactions = []; notify(); }
+    clearAll: async () => { _transactions.forEach(t => deleteCloudDoc("transactions", t.id)); }
   };
 }
 
@@ -168,7 +174,18 @@ export function useAccounts() {
     _listeners.push(fn);
     return () => { _listeners = _listeners.filter((l) => l !== fn); };
   }, []);
-  return { accounts: _accounts, addAccount: (a:any)=>{_accounts=[..._accounts, {...a, id:Date.now().toString(36)}]; saveLocalMeta(); notify();}, deleteAccount: (id:string)=>{_accounts=_accounts.filter(a=>a.id!==id); saveLocalMeta(); notify();} };
+  return { 
+    accounts: _accounts, 
+    addAccount: (a:any)=>{
+      const newAcc = {...a, id: a.id || Date.now().toString(36)};
+      if (_familyId) syncAccountToCloud(newAcc, _familyId);
+      else { _accounts = [..._accounts, newAcc]; notify(); }
+    }, 
+    deleteAccount: (id:string)=>{
+      if (_familyId) deleteCloudDoc("accounts", id);
+      else { _accounts = _accounts.filter(a=>a.id!==id); notify(); }
+    } 
+  };
 }
 
 export function useBudgets() {
@@ -178,7 +195,20 @@ export function useBudgets() {
     _listeners.push(fn);
     return () => { _listeners = _listeners.filter((l) => l !== fn); };
   }, []);
-  return { budgets: _budgets, setBudget: (b:any)=>{const idx=_budgets.findIndex(x=>x.category===b.category); if(idx>-1)_budgets[idx]={...b, id:_budgets[idx].id}; else _budgets=[..._budgets, {...b, id:Date.now().toString(36)}]; saveLocalMeta(); notify();} };
+  return { 
+    budgets: _budgets, 
+    setBudget: (b:any)=>{
+      const id = b.id || Date.now().toString(36);
+      const newBud = {...b, id};
+      if (_familyId) syncBudgetToCloud(newBud, _familyId);
+      else {
+          const idx=_budgets.findIndex(x=>x.category===b.category); 
+          if(idx>-1) _budgets[idx]=newBud; 
+          else _budgets=[..._budgets, newBud]; 
+          notify();
+      }
+    } 
+  };
 }
 
 export function useSavings() {
@@ -188,7 +218,18 @@ export function useSavings() {
     _listeners.push(fn);
     return () => { _listeners = _listeners.filter((l) => l !== fn); };
   }, []);
-  return { savings: _savings, addSaving: (s:any)=>{_savings=[{...s, id:Date.now().toString(36), createdAt:new Date().toISOString()}, ..._savings]; saveLocalMeta(); notify();}, deleteSaving: (id:string)=>{_savings=_savings.filter(s=>s.id!==id); saveLocalMeta(); notify();}};
+  return { 
+    savings: _savings, 
+    addSaving: (s:any)=>{
+      const newSav = {...s, id: Date.now().toString(36), createdAt: new Date().toISOString()};
+      if (_familyId) syncSavingToCloud(newSav, _familyId);
+      else { _savings = [newSav, ..._savings]; notify(); }
+    }, 
+    deleteSaving: (id:string)=>{
+      if (_familyId) deleteCloudDoc("savings", id);
+      else { _savings = _savings.filter(s=>s.id!==id); notify(); }
+    }
+  };
 }
 
 export function useFamilyTransactions() {
@@ -198,5 +239,5 @@ export function useFamilyTransactions() {
     _listeners.push(fn);
     return () => { _listeners = _listeners.filter((l) => l !== fn); };
   }, []);
-  return { familyId: _familyId, familyTransactions: _transactions }; // Using common pool
+  return { familyId: _familyId, familyTransactions: _transactions }; 
 }

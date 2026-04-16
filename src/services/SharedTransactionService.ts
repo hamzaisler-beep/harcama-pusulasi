@@ -1,10 +1,8 @@
 // src/services/SharedTransactionService.ts
 import { 
   collection, 
-  addDoc, 
   query, 
   where, 
-  getDocs, 
   onSnapshot, 
   orderBy,
   limit,
@@ -14,12 +12,12 @@ import {
   deleteDoc
 } from "firebase/firestore";
 import { db, auth } from "./firebase";
-import { Transaction } from "../types";
+import { Transaction, Account, Saving, Budget } from "../types";
 
+// TRANSACTIONS
 export const syncTransactionToCloud = async (tx: Transaction, familyId: string) => {
   if (!familyId) return;
   try {
-    // Use local ID as Firestore document ID to prevent duplicates
     const docRef = doc(db, "transactions", tx.id);
     await setDoc(docRef, {
       ...tx,
@@ -29,28 +27,79 @@ export const syncTransactionToCloud = async (tx: Transaction, familyId: string) 
       uploadedAt: Timestamp.now(),
     }, { merge: true });
   } catch (error) {
-    console.error("Cloud sync error", error);
+    console.error("Transaction cloud sync error", error);
   }
 };
 
-export const subscribeToFamilyTransactions = (familyId: string, callback: (txs: any[]) => void) => {
+export const subscribeToFamilyTransactions = (familyId: string, callback: (txs: Transaction[]) => void) => {
   if (!familyId) return () => {};
-
   const q = query(
     collection(db, "transactions"),
     where("familyId", "==", familyId),
     orderBy("date", "desc"),
-    limit(200)
+    limit(500)
   );
-
   return onSnapshot(q, (snapshot) => {
-    const txs = snapshot.docs.map(doc => ({
-      ...doc.data(),
-      id: doc.id, // Using Firestore ID
-      cloudId: doc.id
-    }));
+    const txs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Transaction);
     callback(txs);
-  }, (err) => {
-    console.error("Family subscription error", err);
   });
+};
+
+// ACCOUNTS
+export const syncAccountToCloud = async (acc: Account, familyId: string) => {
+  if (!familyId) return;
+  try {
+    const docRef = doc(db, "accounts", acc.id);
+    await setDoc(docRef, { ...acc, familyId, updatedAt: Timestamp.now() }, { merge: true });
+  } catch (error) { console.error("Account cloud sync error", error); }
+};
+
+export const subscribeToFamilyAccounts = (familyId: string, callback: (accs: Account[]) => void) => {
+  if (!familyId) return () => {};
+  const q = query(collection(db, "accounts"), where("familyId", "==", familyId));
+  return onSnapshot(q, (snapshot) => {
+    const accs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Account);
+    callback(accs);
+  });
+};
+
+// SAVINGS
+export const syncSavingToCloud = async (sav: Saving, familyId: string) => {
+  if (!familyId) return;
+  try {
+    const docRef = doc(db, "savings", sav.id);
+    await setDoc(docRef, { ...sav, familyId, updatedAt: Timestamp.now() }, { merge: true });
+  } catch (error) { console.error("Saving cloud sync error", error); }
+};
+
+export const subscribeToFamilySavings = (familyId: string, callback: (savs: Saving[]) => void) => {
+  if (!familyId) return () => {};
+  const q = query(collection(db, "savings"), where("familyId", "==", familyId), orderBy("createdAt", "desc"));
+  return onSnapshot(q, (snapshot) => {
+    const savs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Saving);
+    callback(savs);
+  });
+};
+
+// BUDGETS
+export const syncBudgetToCloud = async (bud: Budget, familyId: string) => {
+  if (!familyId) return;
+  try {
+    const docRef = doc(db, "budgets", bud.id);
+    await setDoc(docRef, { ...bud, familyId, updatedAt: Timestamp.now() }, { merge: true });
+  } catch (error) { console.error("Budget cloud sync error", error); }
+};
+
+export const subscribeToFamilyBudgets = (familyId: string, callback: (buds: Budget[]) => void) => {
+  if (!familyId) return () => {};
+  const q = query(collection(db, "budgets"), where("familyId", "==", familyId));
+  return onSnapshot(q, (snapshot) => {
+    const buds = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Budget);
+    callback(buds);
+  });
+};
+
+// DELETE HELPERS
+export const deleteCloudDoc = async (col: string, id: string) => {
+  try { await deleteDoc(doc(db, col, id)); } catch (e) { console.error("Delete error", col, id, e); }
 };
