@@ -126,7 +126,13 @@ export default function DashboardScreen({ navigation }: any) {
       >
         {/* Header */}
         <View style={styles.header}>
-            <Text style={styles.pageTitle}>Dashboard</Text>
+            <View>
+                <Text style={styles.pageTitle}>Dashboard</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#22c55e' }} />
+                    <Text style={{ fontSize: 11, color: '#22c55e', fontWeight: '800' }}>v1.4 - CANLI AKTIF</Text>
+                </View>
+            </View>
             <View style={styles.headerActions}>
                 <TouchableOpacity style={styles.headerIconBtn}>
                     <MaterialIcons name="notifications-none" size={20} color={COLORS.textSecondary} />
