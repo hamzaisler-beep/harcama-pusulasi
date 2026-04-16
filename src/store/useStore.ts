@@ -9,12 +9,16 @@ import { onAuthStateChanged } from "firebase/auth";
 // Safe storage helper
 const getStorage = () => {
   try {
-    if (typeof AsyncStorage !== "undefined" && AsyncStorage && AsyncStorage.getItem) {
+    if (typeof AsyncStorage !== "undefined" && AsyncStorage && typeof AsyncStorage.getItem === 'function') {
       return AsyncStorage;
     }
   } catch (e) {}
   if (typeof window !== "undefined" && window.localStorage) {
-    return window.localStorage;
+    return {
+      getItem: (key: string) => Promise.resolve(window.localStorage.getItem(key)),
+      setItem: (key: string, val: string) => Promise.resolve(window.localStorage.setItem(key, val)),
+      removeItem: (key: string) => Promise.resolve(window.localStorage.removeItem(key)),
+    };
   }
   return null;
 };
@@ -69,18 +73,26 @@ async function saveLocalMeta() {
 }
 
 // THE CENTRAL SYNC ENGINE
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        console.log("Auth stabilized, initiating cloud sync...");
+async function initCloudSync(user: any) {
+    if (!user) {
+        _isSubscribed = false;
+        _familyId = null;
+        _transactions = [];
+        notify();
+        return;
+    }
+
+    try {
+        console.log("Syncing for user:", user.uid);
         const family = await getUserFamily();
-        if (family && !_isSubscribed) {
+        if (family && (!_isSubscribed || _familyId !== family.id)) {
             _familyId = family.id;
             _isSubscribed = true;
             
             // Overwrite EVERYTHING with Family Cloud Data
             subscribeToFamilyTransactions(family.id, (cloudTxs) => {
                 console.log("Cloud Pool Sync:", cloudTxs.length, "transactions found.");
-                _transactions = cloudTxs.filter(t => t.userName !== "Ayşe (Test)");
+                _transactions = cloudTxs;
                 notify();
                 
                 // Keep a local copy for offline view
@@ -88,12 +100,13 @@ onAuthStateChanged(auth, async (user) => {
                 if (storage) storage.setItem(TX_KEY, JSON.stringify(_transactions));
             });
         }
-    } else {
-        _isSubscribed = false;
-        _familyId = null;
-        _transactions = [];
-        notify();
+    } catch (e) {
+        console.error("Cloud sync init error", e);
     }
+}
+
+onAuthStateChanged(auth, (user) => {
+    initCloudSync(user);
 });
 
 loadLocalMeta();
@@ -103,6 +116,12 @@ export function useTransactions() {
   useEffect(() => {
     const fn = () => setTick((t) => t + 1);
     _listeners.push(fn);
+    
+    // Safety check: if we have user but no family sync yet, try again
+    if (auth.currentUser && !_isSubscribed) {
+        initCloudSync(auth.currentUser);
+    }
+    
     return () => { _listeners = _listeners.filter((l) => l !== fn); };
   }, []);
 

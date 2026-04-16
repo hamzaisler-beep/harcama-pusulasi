@@ -11,61 +11,101 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { BarChart, PieChart } from "react-native-chart-kit";
-import { useTransactions, useSavings } from "../store/useStore";
+import { useTransactions, useSavings, useBudgets } from "../store/useStore";
 import { COLORS } from "../types";
 import { formatCurrency } from "../utils/format";
+import { startOfMonth, endOfMonth, isWithinInterval, subMonths, format } from "date-fns";
+import { tr } from "date-fns/locale";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function DashboardScreen({ navigation }: any) {
   const { transactions } = useTransactions();
   const { savings } = useSavings();
+  const { budgets } = useBudgets();
   const { width } = useWindowDimensions();
   const isWeb = width > 1024;
 
+  const now = new Date();
+  const monthStart = startOfMonth(now);
+  const monthEnd = endOfMonth(now);
+
   const { income, expense, balance } = useMemo(() => {
-    const income = transactions
+    const monthTxs = transactions.filter(t => {
+        const d = new Date(t.date);
+        return isWithinInterval(d, { start: monthStart, end: monthEnd });
+    });
+
+    const inc = monthTxs
       .filter((t) => t.type === "income")
-      .reduce((s, t) => s + t.amount, 0);
-    const expense = Math.abs(
-      transactions
-        .filter((t) => t.type === "expense")
-        .reduce((s, t) => s + t.amount, 0)
-    );
-    return { income, expense, balance: income - expense };
+      .reduce((s, t) => s + Number(t.amount || 0), 0);
+    const exp = monthTxs
+      .filter((t) => t.type === "expense")
+      .reduce((s, t) => s + Math.abs(Number(t.amount || 0)), 0);
+    
+    return { income: inc, expense: exp, balance: inc - exp };
   }, [transactions]);
 
   const totalSavings = useMemo(() => {
-    // Demo calculation: Sum of all savings converted to TL (using mock rate 32)
-    return savings.reduce((sum, s) => sum + s.amount * 32, 0);
+    return savings.reduce((sum, s) => sum + Number(s.amount || 0) * 32, 0); // Mock rate
   }, [savings]);
 
-  const recentTx = transactions.slice(0, 6);
+  const recentTx = useMemo(() => transactions.slice(0, 6), [transactions]);
 
-  // Mock Category Data for Donut Chart
+  // CATEGORY DATA FOR PIE CHART
   const categoryData = useMemo(() => {
-    const data = [
-      { name: "Market", amount: 2800, color: COLORS.expense, legendFontColor: "#7F7F7F" },
-      { name: "Giyim", amount: 1500, color: COLORS.primary, legendFontColor: "#7F7F7F" },
-      { name: "Ulaşım", amount: 1200, color: COLORS.amber, legendFontColor: "#7F7F7F" },
-      { name: "Sağlık", amount: 800, color: "#6366f1", legendFontColor: "#7F7F7F" },
-    ];
-    return data;
-  }, []);
+    const cats: Record<string, number> = {};
+    const monthTxs = transactions.filter(t => {
+        const d = new Date(t.date);
+        return isWithinInterval(d, { start: monthStart, end: monthEnd }) && t.type === "expense";
+    });
 
-  const barData = {
-    labels: ["Eki", "Kas", "Ara", "Oca", "Şub", "Mar"],
-    datasets: [
-      {
-        data: [15000, 18000, 12000, 25000, 45000, 30000],
-        color: (opacity = 1) => `rgba(34, 197, 94, ${opacity})`,
-      },
-      {
-        data: [8000, 12000, 9000, 15000, 7869, 12000],
-        color: (opacity = 1) => `rgba(244, 63, 94, ${opacity})`,
-      }
-    ],
-  };
+    monthTxs.forEach(t => {
+        cats[t.category] = (cats[t.category] || 0) + Math.abs(Number(t.amount || 0));
+    });
+
+    const colors = [COLORS.expense, COLORS.primary, COLORS.amber, "#6366f1", "#a855f7", "#ec4899"];
+    return Object.entries(cats)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([name, amount], i) => ({
+            name,
+            amount,
+            color: colors[i % colors.length],
+            legendFontColor: "#7F7F7F"
+        }));
+  }, [transactions]);
+
+  // BAR DATA FOR LAST 6 MONTHS
+  const barData = useMemo(() => {
+    const labels = [];
+    const incomeData = [];
+    const expenseData = [];
+
+    for (let i = 5; i >= 0; i--) {
+        const d = subMonths(now, i);
+        labels.push(format(d, "MMM", { locale: tr }));
+        const s = startOfMonth(d);
+        const e = endOfMonth(d);
+
+        const rangeTxs = transactions.filter(t => {
+            const td = new Date(t.date);
+            return isWithinInterval(td, { start: s, end: e });
+        });
+
+        incomeData.push(rangeTxs.filter(t => t.type === "income").reduce((acc, t) => acc + Number(t.amount || 0), 0));
+        expenseData.push(rangeTxs.filter(t => t.type === "expense").reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0));
+    }
+
+    return {
+        labels,
+        datasets: [
+            { data: incomeData, color: (opacity = 1) => `rgba(34, 197, 94, ${opacity})` },
+            { data: expenseData, color: (opacity = 1) => `rgba(244, 63, 94, ${opacity})` }
+        ],
+    };
+  }, [transactions]);
+
 
   const chartConfig = {
     backgroundGradientFrom: "#111",
@@ -153,19 +193,24 @@ export default function DashboardScreen({ navigation }: any) {
             />
           </View>
           <View style={[styles.card, { flex: 1 }]}>
-            <Text style={styles.cardTitle}>KATEGORİ DAĞILIMI</Text>
-            <PieChart
-              data={categoryData}
-              width={isWeb ? (width - 320) * 0.4 : SCREEN_WIDTH - 40}
-              height={220}
-              chartConfig={chartConfig}
-              accessor={"amount"}
-              backgroundColor={"transparent"}
-              paddingLeft={"15"}
-              center={[10, 0]}
-              absolute
-              hasLegend={true}
-            />
+            {categoryData.length > 0 ? (
+              <PieChart
+                data={categoryData}
+                width={isWeb ? (width - 320) * 0.4 : SCREEN_WIDTH - 40}
+                height={220}
+                chartConfig={chartConfig}
+                accessor={"amount"}
+                backgroundColor={"transparent"}
+                paddingLeft={"15"}
+                center={[10, 0]}
+                absolute
+                hasLegend={true}
+              />
+            ) : (
+                <View style={[styles.emptyBox, { height: 220, justifyContent: 'center' }]}>
+                    <Text style={styles.emptyText}>Veri yok</Text>
+                </View>
+            )}
           </View>
         </View>
 
@@ -190,8 +235,8 @@ export default function DashboardScreen({ navigation }: any) {
                     />
                   </View>
                   <View style={styles.tInfo}>
-                    <Text style={styles.tName} numberOfLines={1}>{t.title || t.description}</Text>
-                    <Text style={styles.tMeta}>{t.category} • Banka</Text>
+                    <Text style={styles.tName} numberOfLines={1}>{t.description || t.title}</Text>
+                    <Text style={styles.tMeta}>{t.category} • {t.userName || "Ben"}</Text>
                   </View>
                   <Text style={[styles.tAmount, { color: t.type === "income" ? COLORS.income : COLORS.expense }]}>
                     {t.type === "income" ? "+" : "-"}{formatCurrency(Math.abs(t.amount))}
@@ -209,11 +254,20 @@ export default function DashboardScreen({ navigation }: any) {
           <View style={[styles.card, { flex: 1 }]}>
             <Text style={styles.cardTitle}>BÜTÇE DURUMU</Text>
             <View style={styles.budgetList}>
-                <BudgetProgress label="Market" current={2800} limit={3000} color={COLORS.expense} />
-                <BudgetProgress label="Restoran" current={450} limit={1500} color={COLORS.primary} />
-                <BudgetProgress label="Ulaşım" current={1200} limit={2000} color={COLORS.amber} />
-                <BudgetProgress label="Eğlence" current={139} limit={1000} color="#6366f1" />
-                <BudgetProgress label="Giyim" current={1800} limit={2000} color={COLORS.expense} />
+                {budgets.length > 0 ? budgets.slice(0, 5).map(b => {
+                    const current = transactions
+                        .filter(t => t.category === b.category && t.type === 'expense' && isWithinInterval(new Date(t.date), { start: monthStart, end: monthEnd }))
+                        .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0);
+                    return (
+                        <BudgetProgress key={b.id} label={b.category} current={current} limit={b.limit} color={current > b.limit ? COLORS.expense : COLORS.primary} />
+                    );
+                }) : (
+                    <>
+                        <BudgetProgress label="Market" current={0} limit={3000} color={COLORS.expense} />
+                        <BudgetProgress label="Fatura" current={0} limit={1500} color={COLORS.primary} />
+                        <Text style={[styles.emptyText, { marginTop: 10 }]}>Bütçe tanımlanmamış.</Text>
+                    </>
+                )}
             </View>
           </View>
         </View>
