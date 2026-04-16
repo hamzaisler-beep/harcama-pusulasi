@@ -18,289 +18,262 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { LineChart } from "react-native-chart-kit";
 import { COLORS } from "../types";
 import { createFamily, joinFamily, getUserFamily, Family } from "../services/familyService";
-import { useFamilyTransactions } from "../store/useStore";
+import { useFamilyTransactions, useTransactions } from "../store/useStore";
 import { calculateFamilyReport, TimePeriod } from "../utils/familyStats";
 import { formatCurrency, formatDate } from "../utils/format";
 import { seedFamilyTransactions } from "../utils/seedData";
 
-const { width } = Dimensions.get("window");
+const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function FamilyScreen() {
-  const [loading, setLoading] = useState(true);
   const [family, setFamily] = useState<Family | null>(null);
-  const [isJoining, setIsJoining] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [code, setCode] = useState("");
-  const [familyName, setFamilyName] = useState("");
+  const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [view, setView] = useState<"options" | "create" | "join">("options");
   
-  const [period, setPeriod] = useState<TimePeriod>("monthly");
+  // Form states
+  const [familyName, setFamilyName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [period, setPeriod] = useState<TimePeriod>("thisMonth");
+
   const { familyTransactions } = useFamilyTransactions();
+  const { clearAll } = useTransactions();
 
   useEffect(() => {
-    fetchFamily();
+    loadFamily();
   }, []);
 
-  // GHOST SEEDING REMOVED - User requested to remove test data
-
-
-  const fetchFamily = async () => {
+  const loadFamily = async () => {
     setLoading(true);
     try {
-      const data = await getUserFamily();
-      setFamily(data);
-    } catch (error) {
-      console.error("Fetch family error", error);
+      const f = await getUserFamily();
+      setFamily(f);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
-  const report = useMemo(() => {
-    return calculateFamilyReport(familyTransactions, period);
-  }, [familyTransactions, period]);
-
   const handleCreate = async () => {
-    if (!familyName) {
-      Alert.alert("Hata", "Lütfen bir aile ismi girin.");
-      return;
-    }
+    if (!familyName.trim()) return;
     setActionLoading(true);
     try {
-      console.log("Calling createFamily...");
-      const res = await createFamily(familyName);
-      console.log("createFamily success", res);
-      if (typeof window !== "undefined") {
-        window.alert("Aileniz Oluşturuldu! Kodunuz: " + res.invitationCode);
-      }
-      setIsCreating(false);
-      await fetchFamily();
-    } catch (error: any) {
-      console.error("FamilyScreen handleCreate error", error);
-      // Alert/window.alert is handled inside service but just in case:
-      Alert.alert("Hata", error.message);
+      const res = await createFamily(familyName.trim());
+      await loadFamily();
+    } catch (e: any) {
+      Alert.alert("Hata", e.message);
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleJoin = async () => {
-    if (!code) {
-      Alert.alert("Hata", "Lütfen bir aile kodu girin.");
-      return;
-    }
+    if (!inviteCode.trim()) return;
     setActionLoading(true);
     try {
-      await joinFamily(code);
-      Alert.alert("Başarılı", "Aileye katıldınız!");
-      setIsJoining(false);
-      fetchFamily();
-    } catch (error: any) {
-      Alert.alert("Hata", error.message);
+      await joinFamily(inviteCode.trim());
+      await loadFamily();
+    } catch (e: any) {
+      Alert.alert("Hata", e.message);
     } finally {
       setActionLoading(false);
     }
   };
 
+  const shareCode = () => {
+    if (!family) return;
+    Share.share({
+      message: `Harcama Pusulası aile grubumuza katıl! Davet Kodu: ${family.invitationCode}`,
+    });
+  };
+
+  const stats = useMemo(() => {
+    return calculateFamilyReport(familyTransactions, period);
+  }, [familyTransactions, period]);
+
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator color={COLORS.primary} size="large" />
       </View>
     );
   }
 
-  if (!family && !isJoining && !isCreating) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <MaterialIcons name="family-restroom" size={64} color={COLORS.primary} />
-            <Text style={styles.title}>Aile Finans Merkezi</Text>
-            <Text style={styles.subtitle}>Bütçenizi tüm aileyle birlikte yönetin, harcamaları anlık takip edin.</Text>
-          </View>
-          <View style={styles.options}>
-            <TouchableOpacity style={styles.optionBtn} onPress={() => setIsCreating(true)}>
-              <MaterialIcons name="add-circle-outline" size={24} color="#fff" />
-              <Text style={styles.optionBtnText}>Aile Oluştur</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.optionBtn, styles.secondaryBtn]} onPress={() => setIsJoining(true)}>
-              <MaterialIcons name="group-add" size={24} color={COLORS.primary} />
-              <Text style={[styles.optionBtnText, styles.secondaryBtnText]}>Kod ile Katıl</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // --- RENDERING ---
 
-  if (isCreating || isJoining) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.container}>
-          <TouchableOpacity onPress={() => { setIsCreating(false); setIsJoining(false); }} style={styles.backBtn}>
-            <MaterialIcons name="arrow-back" size={24} color={COLORS.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.formTitle}>{isCreating ? "Yeni Aile" : "Aileye Katıl"}</Text>
-          <TextInput
-            style={styles.input}
-            placeholder={isCreating ? "Aile İsmi (Örn: Demir Ailesi)" : "6 Haneli Kod (Örn: HPX192)"}
-            value={isCreating ? familyName : code}
-            onChangeText={isCreating ? setFamilyName : setCode}
-            autoCapitalize={isCreating ? "words" : "characters"}
-          />
-          <TouchableOpacity style={styles.submitBtn} onPress={isCreating ? handleCreate : handleJoin} disabled={actionLoading}>
-            {actionLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{isCreating ? "Oluştur" : "Katıl"}</Text>}
-          </TouchableOpacity>
+  const renderInitial = () => (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <MaterialIcons name="groups" size={80} color={COLORS.primary} />
+        <Text style={styles.title}>Aile Alanı</Text>
+        <Text style={styles.subtitle}>
+          Bütçenizi ailenizle birlikte yönetin, harcamalarınızı şeffaf hale getirin.
+        </Text>
+      </View>
+
+      <View style={styles.options}>
+        <TouchableOpacity style={styles.optionBtn} onPress={() => setView("create")}>
+          <MaterialIcons name="add-business" size={24} color="#fff" />
+          <Text style={styles.optionBtnText}>Yeni Aile Grubu Kur</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.optionBtn, styles.secondaryBtn]} onPress={() => setView("join")}>
+          <MaterialIcons name="group-add" size={24} color={COLORS.primary} />
+          <Text style={[styles.optionBtnText, styles.secondaryBtnText]}>Bir Gruba Katıl</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderCreate = () => (
+    <View style={styles.container}>
+      <TouchableOpacity onPress={() => setView("options")} style={styles.backBtn}>
+        <MaterialIcons name="arrow-back" size={28} color={COLORS.textPrimary} />
+      </TouchableOpacity>
+      <Text style={styles.formTitle}>Aile Grubu Kur</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Aile Adı (örn: İşler Ailesi)"
+        value={familyName}
+        onChangeText={setFamilyName}
+        autoFocus
+      />
+      <TouchableOpacity 
+        style={styles.submitBtn} 
+        onPress={handleCreate}
+        disabled={actionLoading}
+      >
+        {actionLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Kur ve Başla</Text>}
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderJoin = () => (
+    <View style={styles.container}>
+      <TouchableOpacity onPress={() => setView("options")} style={styles.backBtn}>
+        <MaterialIcons name="arrow-back" size={28} color={COLORS.textPrimary} />
+      </TouchableOpacity>
+      <Text style={styles.formTitle}>Gruba Katıl</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Davet Kodu (örn: HP-XXXX)"
+        value={inviteCode}
+        onChangeText={setInviteCode}
+        autoFocus
+        autoCapitalize="characters"
+      />
+      <TouchableOpacity 
+        style={styles.submitBtn} 
+        onPress={handleJoin}
+        disabled={actionLoading}
+      >
+        {actionLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Gruba Dahil Ol</Text>}
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderDashboard = () => (
+    <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+      <View style={styles.familyHeader}>
+        <View>
+          <Text style={styles.familyName}>{family?.name}</Text>
+          <Text style={styles.familySub}>{family?.members.length} Üye Etkin</Text>
         </View>
-      </SafeAreaView>
-    );
-  }
+        <TouchableOpacity style={styles.codeBadge} onPress={shareCode}>
+          <Text style={styles.codeText}>{family?.invitationCode}</Text>
+          <MaterialIcons name="share" size={14} color={COLORS.primary} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Period Selector */}
+      <View style={styles.periodRow}>
+        {(['thisMonth', 'lastMonth', 'allTime'] as TimePeriod[]).map(p => (
+           <TouchableOpacity 
+            key={p} 
+            style={[styles.periodBtn, period === p && styles.periodBtnActive]}
+            onPress={() => setPeriod(p)}
+           >
+             <Text style={[styles.periodBtnText, period === p && styles.periodBtnTextActive]}>
+                {p === 'thisMonth' ? 'Bu Ay' : p === 'lastMonth' ? 'Geçen Ay' : 'Tümü'}
+             </Text>
+           </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Report Cards */}
+      <View style={styles.summaryRow}>
+        <View style={[styles.summaryCard, { backgroundColor: COLORS.income + "15" }]}>
+          <Text style={[styles.summaryLabel, { color: COLORS.income }]}>Toplam Gelir</Text>
+          <Text style={[styles.summaryValue, { color: COLORS.income }]}>{formatCurrency(stats.totalIncome)}</Text>
+        </View>
+        <View style={[styles.summaryCard, { backgroundColor: COLORS.expense + "15" }]}>
+          <Text style={[styles.summaryLabel, { color: COLORS.expense }]}>Toplam Gider</Text>
+          <Text style={[styles.summaryValue, { color: COLORS.expense }]}>{formatCurrency(stats.totalExpense)}</Text>
+        </View>
+      </View>
+
+      {/* Member Breakdown */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Üye Bazlı Harcamalar</Text>
+        {stats.memberStats.map(m => (
+          <View key={m.userId} style={styles.memberRow}>
+            <View style={styles.memberAvatar}>
+              <Text style={styles.avatarText}>{m.userName.charAt(0)}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: "700", color: COLORS.textPrimary }}>{m.userName}</Text>
+              <Text style={{ fontSize: 12, color: COLORS.textSecondary }}>{m.transactionCount} işlem</Text>
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={{ fontWeight: "800", color: COLORS.expense }}>{formatCurrency(m.totalExpense)}</Text>
+              <Text style={{ fontSize: 10, color: COLORS.textMuted }}>%{m.percentage.toFixed(0)}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* Recent Activity */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Son Aile Hareketleri</Text>
+        {familyTransactions.slice(0, 5).map(tx => (
+          <View key={tx.id} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f0f0f0" }}>
+             <View>
+               <Text style={{ fontSize: 13, fontWeight: "600" }}>{tx.description}</Text>
+               <Text style={{ fontSize: 11, color: COLORS.textMuted }}>{tx.userName} • {formatDate(tx.date)}</Text>
+             </View>
+             <Text style={{ fontWeight: "700", color: tx.type === 'income' ? COLORS.income : COLORS.expense }}>
+               {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
+             </Text>
+          </View>
+        ))}
+        {familyTransactions.length === 0 && <Text style={styles.emptyText}>Henüz işlem yok.</Text>}
+      </View>
+    </ScrollView>
+  );
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.familyHeader}>
-          <View>
-            <Text style={styles.familyName}>{family.name}</Text>
-            <Text style={styles.familySub}>Aile Finans Özeti</Text>
-          </View>
+      {family ? renderDashboard() : view === "create" ? renderCreate() : view === "join" ? renderJoin() : renderInitial()}
+      
+      {/* GLOBAL WIPE BUTTON (ALWAYS VISIBLE AT THE BOTTOM) */}
+      <View style={styles.wipeContainer}>
           <TouchableOpacity 
-            style={styles.codeBadge} 
-            onPress={() => Share.share({ message: `Harcama Pusulası ailemize katıl! Kod: ${family.invitationCode}` })}
-          >
-            <Text style={styles.codeText}>{family.invitationCode}</Text>
-            <MaterialIcons name="share" size={14} color={COLORS.primary} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Period Selector */}
-        <View style={styles.periodRow}>
-          {[
-            { id: "weekly", label: "Haftalık" },
-            { id: "monthly", label: "Aylık" },
-            { id: "3months", label: "3 Ay" },
-            { id: "yearly", label: "Yıllık" },
-          ].map((p) => (
-            <TouchableOpacity
-              key={p.id}
-              style={[styles.periodBtn, period === p.id && styles.periodBtnActive]}
-              onPress={() => setPeriod(p.id as TimePeriod)}
-            >
-              <Text style={[styles.periodBtnText, period === p.id && styles.periodBtnTextActive]}>
-                {p.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Overview Cards */}
-        <View style={styles.summaryRow}>
-          <View style={[styles.summaryCard, { backgroundColor: COLORS.expenseLight }]}>
-            <Text style={[styles.summaryLabel, { color: COLORS.expense }]}>Toplam Gider</Text>
-            <Text style={[styles.summaryValue, { color: COLORS.expense }]}>{formatCurrency(report.totalExpense)}</Text>
-          </View>
-          <View style={[styles.summaryCard, { backgroundColor: COLORS.incomeLight }]}>
-            <Text style={[styles.summaryLabel, { color: COLORS.income }]}>Toplam Gelir</Text>
-            <Text style={[styles.summaryValue, { color: COLORS.income }]}>{formatCurrency(report.totalIncome)}</Text>
-          </View>
-        </View>
-
-        {/* Chart */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Zaman Çizelgesi</Text>
-          <LineChart
-            data={{
-              labels: report.chartData.labels,
-              datasets: [
-                { data: report.chartData.expenseData, color: () => COLORS.expense, strokeWidth: 2 },
-                { data: report.chartData.incomeData, color: () => COLORS.income, strokeWidth: 2 }
-              ],
-              legend: ["Gider", "Gelir"]
-            }}
-            width={width - 56}
-            height={180}
-            chartConfig={{
-              backgroundColor: "#fff",
-              backgroundGradientFrom: "#fff",
-              backgroundGradientTo: "#fff",
-              decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-              labelColor: () => COLORS.textSecondary,
-              style: { borderRadius: 16 },
-              propsForDots: { r: "3" }
-            }}
-            bezier
-            style={{ borderRadius: 16, marginTop: 12 }}
-            withInnerLines={false}
-          />
-        </View>
-
-        {/* Member Breakdown */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Üye Bazlı Harcama</Text>
-          {report.memberBreakdown.map((m, i) => (
-            <View key={i} style={styles.memberRow}>
-              <View style={styles.memberAvatar}>
-                <Text style={styles.avatarText}>{m.name[0].toUpperCase()}</Text>
-              </View>
-              <View style={styles.memberInfo}>
-                <View style={styles.memberDetails}>
-                  <Text style={styles.memberName}>{m.name}</Text>
-                  <Text style={styles.memberVal}>{formatCurrency(m.amount)}</Text>
-                </View>
-                <View style={styles.progressBg}>
-                  <View style={[styles.progressFill, { width: `${m.percentage}%` }]} />
-                </View>
-              </View>
-            </View>
-          ))}
-          {report.memberBreakdown.length === 0 && <Text style={styles.emptyText}>Henüz üye verisi yok.</Text>}
-        </View>
-
-        {/* Recent Family Transactions */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Son Aile İşlemleri</Text>
-          {familyTransactions.slice(0, 5).map((t, i) => (
-            <View key={i} style={styles.txRow}>
-              <View style={[styles.txIcon, { backgroundColor: t.type === "income" ? COLORS.incomeLight : COLORS.expenseLight }]}>
-                <MaterialIcons name={t.type === "income" ? "arrow-upward" : "arrow-downward"} size={16} color={t.type === "income" ? COLORS.income : COLORS.expense} />
-              </View>
-              <View style={styles.txInfo}>
-                <Text style={styles.txDesc}>{t.description}</Text>
-                <Text style={styles.txMeta}>{t.userName} • {formatDate(t.date)}</Text>
-              </View>
-              <Text style={[styles.txAmount, { color: t.type === "income" ? COLORS.income : COLORS.textPrimary }]}>
-                {t.type === "income" ? "+" : "-"}{formatCurrency(Math.abs(t.amount))}
-              </Text>
-            </View>
-          ))}
-          {familyTransactions.length === 0 && <Text style={styles.emptyText}>Henüz işlem yok.</Text>}
-        </View>
-
-        {/* Temporary Data Cleanup Button */}
-        <View style={[styles.card, { marginTop: 40, borderColor: '#f43f5e', borderStyle: 'dashed', borderWidth: 1 }]}>
-          <Text style={[styles.cardTitle, { color: '#f43f5e' }]}>Tehlikeli Bölge (Geliştirici Seçenekleri)</Text>
-          <Text style={styles.emptyText}>Bu buton buluttaki tüm verilerinizi (İşlem, Hesap, Birikim, Bütçe) tamamen silecektir. Bu işlem geri alınamaz.</Text>
-          <TouchableOpacity 
-            style={[styles.submitBtn, { backgroundColor: '#f43f5e', marginTop: 16 }]} 
+            style={styles.wipeBtn} 
             onPress={async () => {
               Alert.alert(
-                "Tüm Verileri Sil?", 
-                "Tüm test ve yüklü verileriniz silinecektir. Emin misiniz?",
+                "VERİTABANINI SIFIRLA?", 
+                "Tüm işlemleriniz ve hesaplarınız kalıcı olarak silinecektir. Emin misiniz?",
                 [
                   { text: "Vazgeç", style: "cancel" },
                   { 
-                    text: "Evet, Her Şeyi Sil", 
+                    text: "SİL", 
                     style: "destructive", 
                     onPress: async () => {
                       setActionLoading(true);
                       try {
-                        // We'll call a clear function from store (I'll implement it)
-                        const { clearAll } = useTransactions();
-                        // For simplicity, we can do it via a direct script logic if needed, 
-                        // but let's assume useStore has a clearAll helper.
-                        Alert.alert("Başarılı", "Tüm veriler temizlendi. Uygulamayı yenileyebilirsiniz.");
+                        await clearAll();
+                        Alert.alert("Başarılı", "Tüm veritabanı temizlendi.");
                       } catch (e: any) {
                         Alert.alert("Hata", e.message);
                       } finally {
@@ -312,10 +285,10 @@ export default function FamilyScreen() {
               );
             }}
           >
-            <Text style={styles.submitBtnText}>Veritabanını Tamamen Sıfırla</Text>
+            <MaterialIcons name="delete-forever" size={20} color="#fff" />
+            <Text style={styles.wipeBtnText}>TÜM VERİLERİ TEMİZLE</Text>
           </TouchableOpacity>
-        </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -324,7 +297,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   container: { flex: 1, padding: 24, justifyContent: "center" },
-  scroll: { padding: 16 },
+  scroll: { padding: 16, flex: 1 },
   header: { alignItems: "center", marginBottom: 32 },
   title: { fontSize: 26, fontWeight: "800", color: COLORS.textPrimary, marginTop: 16 },
   subtitle: { fontSize: 15, color: COLORS.textSecondary, textAlign: "center", marginTop: 8, paddingHorizontal: 20 },
@@ -353,21 +326,12 @@ const styles = StyleSheet.create({
   summaryLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase" },
   summaryValue: { fontSize: 18, fontWeight: "800" },
   card: { backgroundColor: "#fff", borderRadius: 20, padding: 16, marginBottom: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
-  cardTitle: { fontSize: 15, fontWeight: "700", color: COLORS.textPrimary, marginBottom: 4 },
-  memberRow: { flexDirection: "row", alignItems: "center", marginTop: 16 },
+  cardTitle: { fontSize: 15, fontWeight: "700", color: COLORS.textPrimary, marginBottom: 12 },
+  memberRow: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
   memberAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.primaryLight, alignItems: "center", justifyContent: "center", marginRight: 12 },
   avatarText: { color: COLORS.primary, fontWeight: "800", fontSize: 14 },
-  memberInfo: { flex: 1 },
-  memberDetails: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
-  memberName: { fontSize: 14, fontWeight: "600", color: COLORS.textPrimary },
-  memberVal: { fontSize: 13, fontWeight: "700", color: COLORS.textPrimary },
-  progressBg: { height: 6, backgroundColor: COLORS.background, borderRadius: 3, overflow: "hidden" },
-  progressFill: { height: 6, backgroundColor: COLORS.primary, borderRadius: 3 },
-  txRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  txIcon: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center", marginRight: 12 },
-  txInfo: { flex: 1 },
-  txDesc: { fontSize: 14, fontWeight: "600", color: COLORS.textPrimary },
-  txMeta: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
-  txAmount: { fontSize: 14, fontWeight: "800" },
-  emptyText: { textAlign: "center", color: COLORS.textMuted, fontSize: 13, marginTop: 20 },
+  emptyText: { textAlign: "center", color: COLORS.textMuted, marginTop: 20 },
+  wipeContainer: { padding: 20, backgroundColor: COLORS.background, borderTopWidth: 1, borderTopColor: "#eee" },
+  wipeBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#f43f5e", padding: 14, borderRadius: 12 },
+  wipeBtnText: { color: "#fff", fontWeight: "800", fontSize: 13 },
 });
