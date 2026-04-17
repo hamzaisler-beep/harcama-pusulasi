@@ -329,14 +329,20 @@ export default function TransactionsScreen() {
                             <TouchableOpacity 
                                 style={styles.deleteBtn} 
                                 onPress={() => {
-                                    Alert.alert(
-                                        "İşlemi Sil",
-                                        "Bu harcamayı silmek istediğinize emin misiniz?",
-                                        [
-                                            { text: "Vazgeç", style: "cancel" },
-                                            { text: "Sil", style: "destructive", onPress: () => store.deleteTransaction(tx.id) }
-                                        ]
-                                    );
+                                    if (Platform.OS === 'web') {
+                                        if (window.confirm("Bu harcamayı silmek istediğinize emin misiniz?")) {
+                                            store.deleteTransaction(tx.id);
+                                        }
+                                    } else {
+                                        Alert.alert(
+                                            "İşlemi Sil",
+                                            "Bu harcamayı silmek istediğinize emin misiniz?",
+                                            [
+                                                { text: "Vazgeç", style: "cancel" },
+                                                { text: "Sil", style: "destructive", onPress: () => store.deleteTransaction(tx.id) }
+                                            ]
+                                        );
+                                    }
                                 }}
                             >
                                 <MaterialIcons name="delete-outline" size={18} color={COLORS.textMuted} />
