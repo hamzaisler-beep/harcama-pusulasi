@@ -15,17 +15,10 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import Svg, { Circle } from "react-native-svg";
-import { COLORS } from "../theme/constants";
+import { store } from "../store";
+import { COLORS, Investment } from "../theme/constants";
 
 const { width } = Dimensions.get("window");
-
-const INITIAL_ASSETS = [
-    { id: 1, symbol: "THYAO", type: "Hisse", amount: 100, buyPrice: 280, currentPrice: 310, icon: "analytics", date: "01.06.2024" },
-    { id: 2, symbol: "EREGL", type: "Hisse", amount: 200, buyPrice: 45, currentPrice: 52, icon: "analytics", date: "12.05.2024" },
-    { id: 3, symbol: "Bitcoin", type: "Kripto", amount: 0.05, buyPrice: 2800000, currentPrice: 3200000, icon: "currency-bitcoin", date: "10.04.2024" },
-    { id: 4, symbol: "Altın (gr)", type: "Altın", amount: 10, buyPrice: 2800, currentPrice: 3100, icon: "adjust", date: "15.06.2024" },
-    { id: 5, symbol: "USD", type: "Döviz", amount: 500, buyPrice: 31.50, currentPrice: 33.20, icon: "attach-money", date: "20.06.2024" },
-];
 
 const ASSET_TYPES = [
     { label: "Hisse", icon: "analytics" },
@@ -36,31 +29,46 @@ const ASSET_TYPES = [
 ];
 
 export default function InvestmentsScreen() {
-    const [assets, setAssets] = useState(INITIAL_ASSETS);
-    const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-    const [selectedAsset, setSelectedAsset] = useState<any>(null);
+    const [tick, setTick] = React.useState(0);
+    const [isEditModalVisible, setIsEditModalVisible] = React.useState(false);
+    const [selectedAsset, setSelectedAsset] = React.useState<Investment | null>(null);
+
+    React.useEffect(() => {
+        const fn = () => setTick(t => t + 1);
+        store.listeners.add(fn);
+        return () => { store.listeners.delete(fn); };
+    }, []);
 
     // Form States
-    const [name, setName] = useState("");
-    const [type, setType] = useState("Hisse");
-    const [amount, setAmount] = useState("");
-    const [buyPrice, setBuyPrice] = useState("");
-    const [currentPrice, setCurrentPrice] = useState("");
-    const [date, setDate] = useState("");
+    const [name, setName] = React.useState("");
+    const [type, setType] = React.useState("Hisse");
+    const [amount, setAmount] = React.useState("");
+    const [buyPrice, setBuyPrice] = React.useState("");
+    const [currentPrice, setCurrentPrice] = React.useState("");
+    const [date, setDate] = React.useState("");
+
+    const assets = store.investments;
 
     const stats = useMemo(() => {
         let totalCost = 0;
         let totalValue = 0;
         assets.forEach(a => {
-            totalCost += a.amount * a.buyPrice;
-            totalValue += a.amount * a.currentPrice;
+            const cost = Number(a.amount || 0) * Number(a.buyPrice || 0);
+            const value = Number(a.amount || 0) * Number(a.currentPrice || 0);
+            totalCost += isNaN(cost) ? 0 : cost;
+            totalValue += isNaN(value) ? 0 : value;
         });
         const profit = totalValue - totalCost;
         const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
-        return { totalCost, totalValue, profit, profitPercent };
-    }, [assets]);
+        return { 
+            totalCost: isNaN(totalCost) ? 0 : totalCost, 
+            totalValue: isNaN(totalValue) ? 0 : totalValue, 
+            profit: isNaN(profit) ? 0 : profit, 
+            profitPercent: isNaN(profitPercent) ? 0 : profitPercent 
+        };
+    }, [assets, tick]);
 
-    const handleEdit = (asset: any) => {
+    const handleEdit = (asset: Investment) => {
         setSelectedAsset(asset);
         setName(asset.symbol);
         setType(asset.type);
@@ -71,27 +79,55 @@ export default function InvestmentsScreen() {
         setIsEditModalVisible(true);
     };
 
-    const handleSave = () => {
-        const updated = assets.map(a => a.id === selectedAsset.id ? {
-            ...a,
+    const handleAddNew = () => {
+        setSelectedAsset(null);
+        setName("");
+        setType("Hisse");
+        setAmount("");
+        setBuyPrice("");
+        setCurrentPrice("");
+        setDate(new Date().toLocaleDateString("tr-TR"));
+        setIsEditModalVisible(true);
+    };
+
+    const handleSave = async () => {
+        const icon = ASSET_TYPES.find(t => t.label === type)?.icon || "analytics";
+        const data = {
             symbol: name,
             type: type,
             amount: Number(amount),
             buyPrice: Number(buyPrice),
             currentPrice: Number(currentPrice),
-            date: date
-        } : a);
-        setAssets(updated);
+            date: date,
+            icon: icon
+        };
+
+        if (selectedAsset) {
+            await store.updateInvestment(selectedAsset.id, data);
+        } else {
+            await store.addInvestment(data);
+        }
         setIsEditModalVisible(false);
     };
 
-    const handleDelete = () => {
-        setAssets(assets.filter(a => a.id !== selectedAsset.id));
-        setIsEditModalVisible(false);
+    const handleDelete = async () => {
+        if (selectedAsset) {
+            await store.deleteInvestment(selectedAsset.id);
+            setIsEditModalVisible(false);
+        }
     };
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollInside} showsVerticalScrollIndicator={false}>
+            {/* Header Area */}
+            <View style={styles.headerRow}>
+                <Text style={styles.title}>Varlıklarım</Text>
+                <TouchableOpacity style={styles.addBtn} onPress={handleAddNew}>
+                    <MaterialIcons name="add" size={20} color="#000" />
+                    <Text style={styles.addBtnText}>Varlık Ekle</Text>
+                </TouchableOpacity>
+            </View>
+
             {/* Header Stats */}
             <View style={styles.statRow}>
                 <InvestmentStatBox title="Toplam Maliyet" value={stats.totalCost} color={COLORS.primary} icon="work" />
@@ -273,6 +309,10 @@ const PerformanceChart = ({ data }: any) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scrollInside: { padding: 32 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  title: { fontSize: 24, fontWeight: '800', color: '#fff' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.income, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
+  addBtnText: { color: '#000', fontWeight: '800', fontSize: 14 },
   statRow: { flexDirection: "row", gap: 16, marginBottom: 32 },
   statBox: { flex: 1, backgroundColor: COLORS.card, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.border, position: 'relative', overflow: 'hidden' },
   statLabel: { fontSize: 12, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1, marginBottom: 12 },

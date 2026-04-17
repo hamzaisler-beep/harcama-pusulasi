@@ -51,12 +51,23 @@ export default function DashboardScreen() {
   const stats = useMemo(() => {
     const income = store.transactions
         .filter(t => t.type === "income")
-        .reduce((s, t) => s + Number(t.amount || 0), 0);
+        .reduce((s, t) => {
+            const val = Number(t.amount || 0);
+            return s + (isNaN(val) ? 0 : val);
+        }, 0);
     const expense = store.transactions
         .filter(t => t.type === "expense")
-        .reduce((s, t) => s + Math.abs(Number(t.amount || 0)), 0);
+        .reduce((s, t) => {
+            const val = Math.abs(Number(t.amount || 0));
+            return s + (isNaN(val) ? 0 : val);
+        }, 0);
     const balance = income - expense;
-    return { income, expense, balance, savings: 177500 }; 
+    return { 
+        income: isNaN(income) ? 0 : income, 
+        expense: isNaN(expense) ? 0 : expense, 
+        balance: isNaN(balance) ? 0 : balance, 
+        savings: 177500 
+    }; 
   }, [store.transactions, tick]);
 
   const Sidebar = () => (
@@ -242,21 +253,23 @@ const DashboardMain = ({ stats, transactions }: { stats: any, transactions: Tran
 
 const CustomBarChart = ({ income, expense }: any) => {
     const months = ["Eylül", "Ekim", "Kasım", "Aralık", "Ocak", "Şubat"];
-    const maxVal = Math.max(income, expense, 50000);
+    const safeInc = Number(income) || 0;
+    const safeExp = Number(expense) || 0;
+    const maxVal = Math.max(safeInc, safeExp, 50000);
 
     return (
         <View style={styles.barChartContainer}>
             <View style={styles.barChartDrawArea}>
                 {months.map((m, i) => {
                     const isCurrent = m === "Şubat";
-                    const incH = i === 5 ? (income / maxVal) * 100 : (20 + Math.random() * 50);
-                    const expH = i === 5 ? (expense / maxVal) * 100 : (10 + Math.random() * 40);
+                    const incH = i === 5 ? ((safeInc / maxVal) * 100) : (20 + Math.random() * 50);
+                    const expH = i === 5 ? ((safeExp / maxVal) * 100) : (10 + Math.random() * 40);
                     
                     return (
                         <View key={m} style={styles.barGroup}>
                             <View style={styles.barsContainer}>
-                                <View style={[styles.bar, { height: `${incH}%`, backgroundColor: COLORS.income, opacity: isCurrent ? 1 : 0.3 }]} />
-                                <View style={[styles.bar, { height: `${expH}%`, backgroundColor: COLORS.expense, opacity: isCurrent ? 1 : 0.3 }]} />
+                                <View style={[styles.bar, { height: `${isNaN(incH) ? 0 : incH}%`, backgroundColor: COLORS.income, opacity: isCurrent ? 1 : 0.3 }]} />
+                                <View style={[styles.bar, { height: `${isNaN(expH) ? 0 : expH}%`, backgroundColor: COLORS.expense, opacity: isCurrent ? 1 : 0.3 }]} />
                             </View>
                             <Text style={styles.barLabel}>{m.substring(0, 3)}</Text>
                         </View>
@@ -434,11 +447,11 @@ const styles = StyleSheet.create({
     padding: 20, 
     borderWidth: 1, 
     borderColor: COLORS.border, 
-    shadowColor: "#000", 
-    shadowOffset: { width: 0, height: 10 }, 
-    shadowOpacity: 0.5, 
-    shadowRadius: 20,
-    elevation: 10
+    ...Platform.select({
+        web: { boxShadow: "0px 10px 24px rgba(0,0,0,0.5)" },
+        ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20 },
+        android: { elevation: 10 }
+    })
   },
   profileModalHeader: { alignItems: "flex-start", marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
   largeAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#78dcc8", alignItems: "center", justifyContent: "center", marginBottom: 12 },

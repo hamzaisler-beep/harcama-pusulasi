@@ -12,12 +12,13 @@ import {
   Timestamp 
 } from "firebase/firestore";
 import { db, auth } from "../services/firebase";
-import { Transaction, Account, Saving, Budget } from "../theme/constants";
+import { Transaction, Account, Saving, Budget, Investment } from "../theme/constants";
 
 class GlobalStore {
   transactions: Transaction[] = [];
   accounts: Account[] = [];
   savings: Saving[] = [];
+  investments: Investment[] = [];
   budgets: Budget[] = [];
   familyId: string | null = null;
   listeners: Set<() => void> = new Set();
@@ -31,8 +32,6 @@ class GlobalStore {
     auth.onAuthStateChanged(async (user) => {
       this.stopSync();
       if (user) {
-         // Determine space ID (Personal by default)
-         // For now, we use personal_${uid} as the pool
          const personalId = `personal_${user.uid}`;
          this.startSync(personalId);
       } else {
@@ -49,6 +48,7 @@ class GlobalStore {
     this.transactions = [];
     this.accounts = [];
     this.savings = [];
+    this.investments = [];
     this.budgets = [];
     this.familyId = null;
     this.notify();
@@ -84,6 +84,13 @@ class GlobalStore {
             .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         this.notify();
     }));
+
+    // Investments Sync
+    const qInv = query(collection(db, "investments"), where("familyId", "==", id));
+    this.unsubs.push(onSnapshot(qInv, snap => {
+        this.investments = snap.docs.map(d => ({...d.data(), id: d.id}) as Investment);
+        this.notify();
+    }));
   }
 
   // ACTIONS
@@ -95,6 +102,21 @@ class GlobalStore {
 
   async deleteTransaction(id: string) {
     await deleteDoc(doc(db, "transactions", id));
+  }
+
+  async addInvestment(inv: Omit<Investment, "id">) {
+    const id = Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+    const docRef = doc(db, "investments", id);
+    await setDoc(docRef, { ...inv, id, familyId: this.familyId });
+  }
+
+  async updateInvestment(id: string, inv: Partial<Investment>) {
+    const docRef = doc(db, "investments", id);
+    await setDoc(docRef, inv, { merge: true });
+  }
+
+  async deleteInvestment(id: string) {
+    await deleteDoc(doc(db, "investments", id));
   }
 }
 

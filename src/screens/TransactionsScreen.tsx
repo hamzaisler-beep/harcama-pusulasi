@@ -126,17 +126,20 @@ export default function TransactionsScreen() {
 
     const handleImportFile = async () => {
         try {
-            const res = await DocumentPicker.getDocumentAsync({ 
-                type: Platform.OS === 'web' ? ".xlsx,.xls,.csv" : ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "text/csv"] 
+            const result = await DocumentPicker.getDocumentAsync({
+                type: [
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                    "application/vnd.ms-excel",
+                    "text/csv"
+                ],
             });
-            
-            if (res.canceled) return;
-            
-            const fileAsset = res.assets[0];
+
+            if (result.canceled) return;
+
             if (Platform.OS === 'web') {
-                const rawFile = (fileAsset as any).file || fileAsset;
+                const rawFile = (result as any).output?.[0] || (result as any).file;
                 if (!rawFile) {
-                    Alert.alert("Teşhis", "Dosya içeriği okunamadı. Tarayıcı desteğini kontrol edin.");
+                    Alert.alert("Hata", "Dosya okunamadı.");
                     return;
                 }
 
@@ -146,13 +149,14 @@ export default function TransactionsScreen() {
                         const data = new Uint8Array(e.target.result);
                         const wb = XLSX.read(data, { type: 'array' });
                         const ws = wb.Sheets[wb.SheetNames[0]];
-                        const json = XLSX.utils.sheet_to_json(ws);
+                        // Read as raw arrays to find header manually
+                        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
                         
-                        if (!json || json.length === 0) {
+                        if (!rows || rows.length === 0) {
                             Alert.alert("Bilgi", "Seçilen sayfada veri bulunamadı.");
                             return;
                         }
-                        processImportData(json);
+                        processImportData(rows);
                     } catch (readErr) {
                         Alert.alert("Hata", "Dosya işleme hatası. Lütfen Excel formatını kontrol edin.");
                     }
@@ -167,70 +171,81 @@ export default function TransactionsScreen() {
         }
     };
 
-    const processImportData = (rawRows: any[]) => {
-        // Robustness: Sometimes the first row is NOT the header in bank statements
-        // We find the header row by searching for keys
-        let dataRows = rawRows;
-        let bestHeaderIdx = -1;
-        const keywords = ["tutar", "borç", "alacak", "açıklama", "tarih", "işlem", "price", "amount", "date"];
+    const processImportData = (rows: any[][]) => {
+        const keywords = ["tutar", "borc", "alacak", "aciklama", "tarih", "islem", "price", "amount", "date"];
+        const normalize = (s: any) => s?.toString().toLowerCase()
+            .replace(/ı/g, 'i').replace(/ü/g,'u').replace(/ş/g,'s')
+            .replace(/ö/g,'o').replace(/ç/g,'c').replace(/ğ/g,'g') || "";
 
-        for (let i = 0; i < Math.min(20, rawRows.length); i++) {
-            const keys = Object.keys(rawRows[i]).map(k => k.toLowerCase());
-            const matchCount = keywords.filter(w => keys.some(k => k.includes(w))).length;
-            if (matchCount >= 2) {
-                bestHeaderIdx = i;
+        let headerIdx = -1;
+        let mapping: any = {};
+
+        // 1. Find the header row
+        for (let i = 0; i < Math.min(30, rows.length); i++) {
+            const row = rows[i];
+            if (!Array.isArray(row)) continue;
+            
+            const rowKeys = row.map(cell => normalize(cell));
+            const amountIdx = rowKeys.findIndex(k => k.match(/tutar|price|amount|bakiye|borc|alacak/));
+            const descIdx = rowKeys.findIndex(k => k.match(/aciklama|description|tanim|islem|detay/));
+            
+            if (amountIdx !== -1 && descIdx !== -1) {
+                headerIdx = i;
+                mapping = {
+                    amount: amountIdx,
+                    desc: descIdx,
+                    date: rowKeys.findIndex(k => k.match(/tarih|date/))
+                };
                 break;
             }
         }
 
-        const mapped = dataRows.map((row, idx) => {
-            const keys = Object.keys(row);
-            // Turkish characters normalization or flexible regex
-            const findKey = (regex: RegExp) => keys.find(k => k.toLowerCase().replace(/ı/g, 'i').replace(/ü/g,'u').replace(/ş/g,'s').replace(/ö/g,'o').replace(/ç/g,'c').replace(/ğ/g,'g').match(regex));
+        if (headerIdx === -1) {
+            Alert.alert("Hata", "Uygun başlıklar (Tutar, Açıklama vb.) bulunamadı. Lütfen Excel'de ilgili sütunların olduğundan emin olun.");
+            return;
+        }
 
-            const amountKey = findKey(/tutar|price|amount|bakiye|borc|alacak/i);
-            const descKey = findKey(/aciklama|description|tanim|islem|detay/i);
-            const dateKey = findKey(/tarih|date/i);
+        // 2. Map data rows
+        const mapped = rows.slice(headerIdx + 1).map(row => {
+            if (!row || row[mapping.amount] === undefined) return null;
 
-            if (!amountKey || !descKey) return null;
-
-            let rawVal = row[amountKey]?.toString() || "0";
-            // Clean currency symbols and spaces, normalize decimal
+            let rawVal = row[mapping.amount]?.toString() || "0";
             let cleanVal = rawVal.replace(/[^\d.,-]/g, ""); 
             
-            // Handle European format (1.234,56) vs US format (1,234.56)
             if (cleanVal.includes(",") && cleanVal.includes(".")) {
-                // Determine which is decimal based on last position
                 if (cleanVal.lastIndexOf(".") > cleanVal.lastIndexOf(",")) {
-                    cleanVal = cleanVal.replace(/,/g, ""); // US
+                    cleanVal = cleanVal.replace(/,/g, ""); 
                 } else {
-                    cleanVal = cleanVal.replace(/\./g, "").replace(",", "."); // EU/TR
+                    cleanVal = cleanVal.replace(/\./g, "").replace(",", ".");
                 }
             } else if (cleanVal.includes(",")) {
                 cleanVal = cleanVal.replace(",", ".");
             }
             
             const amt = parseFloat(cleanVal);
-            if (isNaN(amt)) return null;
+            if (isNaN(amt) || amt === 0) return null;
 
+            // Type check based on column name or value
+            const colName = normalize(rows[headerIdx][mapping.amount]);
             let txType: "income" | "expense" = amt > 0 ? "income" : "expense";
-            const lowAmtKey = amountKey.toLowerCase();
-            if (lowAmtKey.includes("borc")) txType = "expense";
-            if (lowAmtKey.includes("alacak")) txType = "income";
+            if (colName.includes("borc")) txType = "expense";
+            if (colName.includes("alacak")) txType = "income";
 
             return {
+                id: Math.random().toString(36).substring(7),
                 amount: Math.abs(amt),
-                description: row[descKey] || "İsimsiz İşlem",
-                date: row[dateKey] || new Date().toISOString(),
+                description: row[mapping.desc]?.toString() || "İsimsiz İşlem",
+                date: row[mapping.date]?.toString() || new Date().toISOString(),
                 type: txType,
-                category: "Faturalar"
+                category: "Banka İçe Aktarma"
             };
         }).filter(Boolean);
 
         if (mapped.length === 0) {
-            Alert.alert("Hata", "Uygun başlıklar (Tutar, Açıklama vb.) bulunamadı. Lütfen Excel başlıklarını kontrol edin.");
+            Alert.alert("Hata", "Dosyada aktarılabilir işlem bulunamadı.");
             return;
         }
+        
         setImportList(mapped);
         setIsImportModalVisible(true);
     };

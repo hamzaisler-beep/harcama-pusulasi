@@ -1,6 +1,7 @@
 // src/navigation/RootNavigator.tsx
 import React, { useState, useEffect } from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { View, ActivityIndicator } from "react-native";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../services/firebase";
 
@@ -21,7 +22,13 @@ export default function RootNavigator() {
     return unsub;
   }, []);
 
-  if (initializing) return null;
+  if (initializing) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#0F1117", alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator size="large" color="#6C63FF" />
+      </View>
+    );
+  }
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>

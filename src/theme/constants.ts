@@ -61,6 +61,18 @@ export interface Saving {
   createdAt: string;
 }
 
+export interface Investment {
+  id: string;
+  symbol: string;
+  type: string;
+  amount: number;
+  buyPrice: number;
+  currentPrice: number;
+  date: string;
+  icon: string;
+  familyId?: string;
+}
+
 export interface Budget {
   id: string;
   category: string;
