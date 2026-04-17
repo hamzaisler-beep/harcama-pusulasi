@@ -1,16 +1,25 @@
 // src/theme/index.ts
 export const COLORS = {
-  primary: "#6366f1", // Indigo
-  secondary: "#a855f7", // Purple
-  background: "#0a0a0c", // Deep Night
-  card: "#121216", // Dark Card
-  cardSecondary: "#1c1c24",
-  text: "#ffffff",
-  textMuted: "#8e8e93",
-  income: "#22c55e",
-  expense: "#f43f5e",
-  border: "rgba(255,255,255,0.06)",
-  accent: "#38bdf8", // Sky Blue
+  background: "#0F1117", // --bg
+  card: "#171A24",       // --bg2 (Panel, Sidebar, Card)
+  cardSecondary: "#1E2130", // --bg3 (Hover, Inputs)
+  track: "#252A3A",      // --bg4 (Progress track)
+  primary: "#6C63FF",    // --accent (Mor)
+  income: "#48BB78",     // --green
+  expense: "#FC8181",    // --red
+  warning: "#F6E05E",    // --yellow
+  info: "#63B3ED",       // --blue
+  accent2: "#F687B3",    // --pink
+  text: "#E2E8F0",       // --text
+  textSecondary: "#A0Aec0", // --text2
+  textMuted: "#718096",  // --text3
+  border: "rgba(255,255,255,0.07)",
+  accent: "#6C63FF",
+};
+
+export const RADII = {
+  default: 12,
+  sm: 9,
 };
 
 export const SPACING = {
