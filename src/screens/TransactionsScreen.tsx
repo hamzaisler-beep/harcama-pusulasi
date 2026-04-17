@@ -167,22 +167,56 @@ export default function TransactionsScreen() {
         }
     };
 
-    const processImportData = (rows: any[]) => {
-        const mapped = rows.map(row => {
+    const processImportData = (rawRows: any[]) => {
+        // Robustness: Sometimes the first row is NOT the header in bank statements
+        // We find the header row by searching for keys
+        let dataRows = rawRows;
+        let bestHeaderIdx = -1;
+        const keywords = ["tutar", "borç", "alacak", "açıklama", "tarih", "işlem", "price", "amount", "date"];
+
+        for (let i = 0; i < Math.min(20, rawRows.length); i++) {
+            const keys = Object.keys(rawRows[i]).map(k => k.toLowerCase());
+            const matchCount = keywords.filter(w => keys.some(k => k.includes(w))).length;
+            if (matchCount >= 2) {
+                bestHeaderIdx = i;
+                break;
+            }
+        }
+
+        const mapped = dataRows.map((row, idx) => {
             const keys = Object.keys(row);
-            const amountKey = keys.find(k => k.toLowerCase().match(/tutar|price|amount|bakiye|borç|alacak/));
-            const descKey = keys.find(k => k.toLowerCase().match(/açıklama|description|tanım|işlem|detay/));
-            const dateKey = keys.find(k => k.toLowerCase().match(/tarih|date/));
+            // Turkish characters normalization or flexible regex
+            const findKey = (regex: RegExp) => keys.find(k => k.toLowerCase().replace(/ı/g, 'i').replace(/ü/g,'u').replace(/ş/g,'s').replace(/ö/g,'o').replace(/ç/g,'c').replace(/ğ/g,'g').match(regex));
+
+            const amountKey = findKey(/tutar|price|amount|bakiye|borc|alacak/i);
+            const descKey = findKey(/aciklama|description|tanim|islem|detay/i);
+            const dateKey = findKey(/tarih|date/i);
 
             if (!amountKey || !descKey) return null;
 
-            let rawAmt = row[amountKey]?.toString().replace(/[^\d.-]/g, "").replace(",", ".");
-            const amt = parseFloat(rawAmt);
+            let rawVal = row[amountKey]?.toString() || "0";
+            // Clean currency symbols and spaces, normalize decimal
+            let cleanVal = rawVal.replace(/[^\d.,-]/g, ""); 
+            
+            // Handle European format (1.234,56) vs US format (1,234.56)
+            if (cleanVal.includes(",") && cleanVal.includes(".")) {
+                // Determine which is decimal based on last position
+                if (cleanVal.lastIndexOf(".") > cleanVal.lastIndexOf(",")) {
+                    cleanVal = cleanVal.replace(/,/g, ""); // US
+                } else {
+                    cleanVal = cleanVal.replace(/\./g, "").replace(",", "."); // EU/TR
+                }
+            } else if (cleanVal.includes(",")) {
+                cleanVal = cleanVal.replace(",", ".");
+            }
+            
+            const amt = parseFloat(cleanVal);
             if (isNaN(amt)) return null;
 
             let txType: "income" | "expense" = amt > 0 ? "income" : "expense";
-            if (amountKey.toLowerCase().includes("borç")) txType = "expense";
-            if (amountKey.toLowerCase().includes("alacak")) txType = "income";
+            const lowAmtKey = amountKey.toLowerCase();
+            if (lowAmtKey.includes("borc")) txType = "expense";
+            if (lowAmtKey.includes("alacak")) txType = "income";
 
             return {
                 amount: Math.abs(amt),
@@ -194,7 +228,7 @@ export default function TransactionsScreen() {
         }).filter(Boolean);
 
         if (mapped.length === 0) {
-            Alert.alert("Hata", "Uygun sütun (Tutar, Açıklama vb.) bulunamadı.");
+            Alert.alert("Hata", "Uygun başlıklar (Tutar, Açıklama vb.) bulunamadı. Lütfen Excel başlıklarını kontrol edin.");
             return;
         }
         setImportList(mapped);
@@ -292,6 +326,21 @@ export default function TransactionsScreen() {
                                 </Text>
                                 <Text style={styles.txCategory}>{tx.category}</Text>
                             </View>
+                            <TouchableOpacity 
+                                style={styles.deleteBtn} 
+                                onPress={() => {
+                                    Alert.alert(
+                                        "İşlemi Sil",
+                                        "Bu harcamayı silmek istediğinize emin misiniz?",
+                                        [
+                                            { text: "Vazgeç", style: "cancel" },
+                                            { text: "Sil", style: "destructive", onPress: () => store.deleteTransaction(tx.id) }
+                                        ]
+                                    );
+                                }}
+                            >
+                                <MaterialIcons name="delete-outline" size={18} color={COLORS.textMuted} />
+                            </TouchableOpacity>
                         </View>
                     ))
                 )}
@@ -466,9 +515,10 @@ const styles = StyleSheet.create({
   txInfo: { flex: 1, marginLeft: 16 },
   txTitle: { color: "#fff", fontSize: 15, fontWeight: "600" },
   txMeta: { color: COLORS.textMuted, fontSize: 11, marginTop: 2 },
-  txAmountBox: { alignItems: "flex-end" },
+  txAmountBox: { alignItems: "flex-end", marginRight: 12 },
   txAmount: { fontSize: 15, fontWeight: "800", fontFamily: "Space Mono, monospace" },
   txCategory: { color: COLORS.textMuted, fontSize: 10, marginTop: 2 },
+  deleteBtn: { padding: 8, marginLeft: 4 },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center", padding: 20 },
   modalContent: { width: "100%", maxWidth: 500, backgroundColor: COLORS.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: COLORS.border },
   modalTitle: { fontSize: 20, fontWeight: "800", color: "#fff", marginBottom: 24 },
