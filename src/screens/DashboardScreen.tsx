@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import Svg, { Circle, Rect } from "react-native-svg";
 import { store } from "../store";
+import { auth } from "../services/firebase";
 import { COLORS, RADII, Transaction } from "../theme/constants";
 
 // Import Placeholder Screens
@@ -56,13 +57,19 @@ export default function DashboardScreen() {
       <View style={styles.sidebarHeader}>
         <View style={styles.userCardTop}>
             <View style={styles.avatar}>
-                <Text style={{ color: "#000", fontWeight: "700" }}>DK</Text>
+                <Text style={{ color: "#000", fontWeight: "700" }}>
+                  {(auth.currentUser?.displayName || auth.currentUser?.email || "K").substring(0, 2).toUpperCase()}
+                </Text>
             </View>
             <View style={{ flex: 1 }}>
-                <Text style={styles.userName}>Demo Kullanıcı</Text>
-                <Text style={styles.userEmail}>demo@finflow.app</Text>
+                <Text style={styles.userName} numberOfLines={1}>
+                  {auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || "Kullanıcı"}
+                </Text>
+                <TouchableOpacity style={styles.settingsLink}>
+                  <Text style={styles.settingsLinkText}>Hesap Ayarları</Text>
+                </TouchableOpacity>
             </View>
-            <MaterialIcons name="unfold-more" size={20} color={COLORS.textMuted} />
+            <MaterialIcons name="chevron-right" size={20} color={COLORS.textMuted} />
         </View>
       </View>
       <View style={styles.navSection}>
@@ -319,7 +326,8 @@ const styles = StyleSheet.create({
   userCardTop: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#78dcc8", alignItems: "center", justifyContent: "center" },
   userName: { color: "#fff", fontSize: 14, fontWeight: "700" },
-  userEmail: { color: COLORS.textMuted, fontSize: 11 },
+  settingsLink: { marginTop: 2 },
+  settingsLinkText: { color: "#10b981", fontSize: 11, fontWeight: "600" },
   navSection: { marginBottom: 32 },
   navSectionTitle: { fontSize: 10, color: COLORS.textMuted, letterSpacing: 1.2, fontWeight: "700", marginBottom: 16, paddingHorizontal: 24 },
   navItem: { flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 24, marginBottom: 4, gap: 14 },
