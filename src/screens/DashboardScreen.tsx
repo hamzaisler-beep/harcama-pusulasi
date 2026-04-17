@@ -7,7 +7,9 @@ import {
   ScrollView, 
   TouchableOpacity, 
   Dimensions, 
-  Platform 
+  Platform,
+  Modal,
+  TouchableWithoutFeedback
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -34,12 +36,17 @@ const isWeb = Platform.OS === "web" || width > 1024;
 export default function DashboardScreen() {
   const [tick, setTick] = useState(0);
   const [activeTab, setActiveTab] = useState("Dashboard");
+  const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
 
   useEffect(() => {
     const fn = () => setTick(t => t + 1);
     store.listeners.add(fn);
     return () => { store.listeners.delete(fn); };
   }, []);
+
+  const handleLogout = () => {
+    auth.signOut();
+  };
 
   const stats = useMemo(() => {
     const income = store.transactions
@@ -55,7 +62,7 @@ export default function DashboardScreen() {
   const Sidebar = () => (
     <View style={styles.sidebar}>
       <View style={styles.sidebarHeader}>
-        <View style={styles.userCardTop}>
+        <TouchableOpacity style={styles.userCardTop} onPress={() => setIsProfileModalVisible(true)}>
             <View style={styles.avatar}>
                 <Text style={{ color: "#000", fontWeight: "700" }}>
                   {(auth.currentUser?.displayName || auth.currentUser?.email || "K").substring(0, 2).toUpperCase()}
@@ -65,12 +72,10 @@ export default function DashboardScreen() {
                 <Text style={styles.userName} numberOfLines={1}>
                   {auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || "Kullanıcı"}
                 </Text>
-                <TouchableOpacity style={styles.settingsLink}>
-                  <Text style={styles.settingsLinkText}>Hesap Ayarları</Text>
-                </TouchableOpacity>
+                <Text style={styles.settingsLinkText}>Hesap ve Profil</Text>
             </View>
-            <MaterialIcons name="chevron-right" size={20} color={COLORS.textMuted} />
-        </View>
+            <MaterialIcons name="more-vert" size={20} color={COLORS.textMuted} />
+        </TouchableOpacity>
       </View>
       <View style={styles.navSection}>
         <Text style={styles.navSectionTitle}>ANA MENÜ</Text>
@@ -134,9 +139,49 @@ export default function DashboardScreen() {
             {renderContent()}
         </View>
       </View>
+
+      {/* Profile Settings Modal */}
+      <Modal visible={isProfileModalVisible} transparent animationType="fade">
+          <View style={styles.profileModalOverlay}>
+              <TouchableWithoutFeedback onPress={() => setIsProfileModalVisible(false)}>
+                  <View style={StyleSheet.absoluteFill} />
+              </TouchableWithoutFeedback>
+              <View style={styles.profileModalContent}>
+                  <View style={styles.profileModalHeader}>
+                      <View style={styles.largeAvatar}>
+                          <Text style={styles.largeAvatarText}>
+                              {(auth.currentUser?.displayName || auth.currentUser?.email || "K").substring(0, 2).toUpperCase()}
+                          </Text>
+                      </View>
+                      <Text style={styles.modalUserName}>{auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0]}</Text>
+                      <Text style={styles.modalUserEmail}>{auth.currentUser?.email}</Text>
+                  </View>
+
+                  <View style={styles.modalMenu}>
+                      <ProfileMenuItem icon="person-outline" label="Profil Bilgileri" onPress={() => {}} />
+                      <ProfileMenuItem icon="lock-outline" label="Şifre Değiştir" onPress={() => {}} />
+                      <ProfileMenuItem icon="camera-alt" label="Profil Fotoğrafı Ekle" onPress={() => {}} />
+                      <ProfileMenuItem icon="notifications-none" label="Bildirim Ayarları" onPress={() => {}} />
+                  </View>
+
+                  <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+                      <MaterialIcons name="logout" size={20} color={COLORS.expense} />
+                      <Text style={styles.logoutText}>Çıkış Yap</Text>
+                  </TouchableOpacity>
+              </View>
+          </View>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+const ProfileMenuItem = ({ icon, label, onPress }: any) => (
+    <TouchableOpacity style={styles.profileMenuItem} onPress={onPress}>
+        <MaterialIcons name={icon} size={22} color={COLORS.textSecondary} />
+        <Text style={styles.profileMenuLabel}>{label}</Text>
+        <MaterialIcons name="chevron-right" size={20} color={COLORS.textMuted} />
+    </TouchableOpacity>
+);
 
 const DashboardMain = ({ stats, transactions }: { stats: any, transactions: Transaction[] }) => {
     return (
@@ -376,4 +421,18 @@ const styles = StyleSheet.create({
   doughnutLegend: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 12, marginTop: 24 },
 
   budgetRow: { marginBottom: 20 },
+
+  // Profile Modal Styles
+  profileModalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.8)", justifyContent: "center", alignItems: "flex-end", paddingRight: width > 1200 ? (width - 1200)/2 + 20 : 20 },
+  profileModalContent: { width: 320, backgroundColor: "#1c1f2b", borderRadius: 20, padding: 24, borderWidth: 1, borderColor: COLORS.border, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20 },
+  profileModalHeader: { alignItems: "center", marginBottom: 32 },
+  largeAvatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: "#78dcc8", alignItems: "center", justifyContent: "center", marginBottom: 16 },
+  largeAvatarText: { fontSize: 24, fontWeight: "800", color: "#000" },
+  modalUserName: { fontSize: 18, fontWeight: "700", color: "#fff", marginBottom: 4 },
+  modalUserEmail: { fontSize: 13, color: COLORS.textMuted },
+  modalMenu: { marginBottom: 32 },
+  profileMenuItem: { flexDirection: "row", alignItems: "center", paddingVertical: 14, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.03)" },
+  profileMenuLabel: { flex: 1, marginLeft: 16, color: COLORS.text, fontSize: 14, fontWeight: "600" },
+  logoutBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16, borderRadius: 12, backgroundColor: "rgba(252, 129, 129, 0.1)", borderWidth: 1, borderColor: "rgba(252, 129, 129, 0.2)" },
+  logoutText: { color: COLORS.expense, fontSize: 14, fontWeight: "700" },
 });
