@@ -1,4 +1,9 @@
-# Harcama Pusulası v2.0 - Premium Finansal Dashboard
+# Harcama Pusulası - Premium Finansal Dashboard
+
+**Canlı:** https://harcama-pusulasi-hamzaisler-beeps-projects.vercel.app
+
+> Not: Eski `harcamapusulasi.vercel.app` adresi artık bu projeye bağlı değil,
+> orada güncel olmayan bir sürüm duruyor. Yukarıdaki adresi kullanın.
 
 Modern, karanlık temalı ve yüksek performanslı finansal yönetim uygulaması. Expo (React Native Web) ile geliştirilmiştir.
 
