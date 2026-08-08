@@ -160,12 +160,12 @@ const SideBySideBarChart = ({ data }: any) => {
     );
 };
 
-const getIconName = (cat: string) => {
+const getIconName = (cat: string): any => {
     const c = cat.toLowerCase();
     if (c.includes("market")) return "shopping-cart";
     if (c.includes("restoran") || c.includes("yemek")) return "restaurant";
     if (c.includes("ulaşım") || c.includes("akaryakıt")) return "directions-car";
-    if (c.includes("giyim")) return "apparel";
+    if (c.includes("giyim")) return "checkroom";
     if (c.includes("eğlence")) return "videogame-asset";
     if (c.includes("fatura")) return "bolt";
     return "category";

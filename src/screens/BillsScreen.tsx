@@ -124,7 +124,7 @@ export default function BillsScreen() {
                                     <View style={styles.billHeaderRow}>
                                         <Text style={styles.billTitleSmall}>{b.title}</Text>
                                         <Text style={[styles.billAmountSmall, b.isPaid && { color: COLORS.income }]}>
-                                            ₺{new Intl.NumberFormat("tr-TR").format(b.isPaid ? b.paidAmount : b.amount)}
+                                            ₺{new Intl.NumberFormat("tr-TR").format(b.isPaid ? (b.paidAmount ?? 0) : b.amount)}
                                         </Text>
                                     </View>
                                     <View style={styles.billInfoRow}>

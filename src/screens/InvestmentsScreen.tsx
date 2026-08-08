@@ -169,7 +169,7 @@ export default function InvestmentsScreen() {
                     return (
                         <View key={idx} style={styles.tableRow}>
                             <Text style={[styles.td, styles.tdSymbol, { flex: 1.5 }]}>{asset.symbol}</Text>
-                            <View style={[styles.td, { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <MaterialIcons name={asset.icon as any} size={14} color={COLORS.textMuted} />
                                 <Text style={styles.tdLabel}>{asset.type}</Text>
                             </View>
@@ -177,7 +177,7 @@ export default function InvestmentsScreen() {
                             <Text style={[styles.td, { flex: 1.2 }]}>₺{new Intl.NumberFormat("tr-TR").format(asset.buyPrice)}</Text>
                             <Text style={[styles.td, { flex: 1.2, fontWeight: '700', color: COLORS.info }]}>₺{new Intl.NumberFormat("tr-TR").format(asset.currentPrice)}</Text>
                             <Text style={[styles.td, { flex: 1.2, fontWeight: '700' }]}>₺{new Intl.NumberFormat("tr-TR").format(rowValue)}</Text>
-                            <View style={[styles.td, { flex: 1.5 }]}>
+                            <View style={{ flex: 1.5 }}>
                                 <Text style={{ color: rowProfit >= 0 ? COLORS.income : COLORS.expense, fontWeight: '700', fontSize: 13 }}>
                                     {rowProfit >= 0 ? '+' : ''}₺{new Intl.NumberFormat("tr-TR").format(rowProfit)}
                                 </Text>

@@ -78,4 +78,31 @@ export interface Budget {
   category: string;
   limit: number;
   period: "monthly";
+  familyId?: string;
+  createdAt?: string;
+}
+
+export interface Goal {
+  id: string;
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+  deadline?: string; // ISO
+  icon?: string;
+  color?: string;
+  createdAt: string;
+  familyId?: string;
+}
+
+// type: "owe" = ben borçluyum (verecek), "owed" = bana borçlu (alacak)
+export interface Debt {
+  id: string;
+  person: string;
+  amount: number;
+  type: "owe" | "owed";
+  description?: string;
+  dueDate?: string; // ISO
+  isSettled?: boolean;
+  createdAt: string;
+  familyId?: string;
 }

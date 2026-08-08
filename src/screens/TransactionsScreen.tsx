@@ -45,7 +45,7 @@ const CATEGORIES = [
     { label: "Ulaşım", icon: "directions-car" },
     { label: "Eğlence", icon: "videogame-asset" },
     { label: "Kira Geliri", icon: "home" },
-    { label: "Giyim", icon: "apparel" },
+    { label: "Giyim", icon: "checkroom" },
     { label: "Sağlık", icon: "fitness-center" },
     { label: "Diğer", icon: "category" }
 ];
