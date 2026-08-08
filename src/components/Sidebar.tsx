@@ -3,7 +3,7 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { auth } from "../services/firebase";
-import { COLORS } from "../theme/constants";
+import { APP_VERSION, COLORS } from "../theme/constants";
 
 export type NavItem = { icon: any; label: string; target: string };
 
@@ -83,6 +83,8 @@ export default function Sidebar({ activeTab, onSelect, onProfilePress }: Props) 
             })}
           </View>
         ))}
+
+        <Text style={styles.version}>Sürüm {APP_VERSION}</Text>
       </ScrollView>
     </View>
   );
@@ -101,4 +103,5 @@ const styles = StyleSheet.create({
   navItemActive: { backgroundColor: "rgba(16, 185, 129, 0.08)", borderLeftWidth: 4, borderLeftColor: "#10b981" },
   navItemLabel: { color: COLORS.textSecondary, fontSize: 14, fontWeight: "600" },
   activeNavLabel: { color: "#10b981" },
+  version: { color: COLORS.textMuted, fontSize: 10, paddingHorizontal: 24, paddingBottom: 8, opacity: 0.7 },
 });

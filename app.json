@@ -2,7 +2,7 @@
   "expo": {
     "name": "Harcama Pusulası",
     "slug": "HarcamaPusulasi",
-    "version": "1.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0F1117",

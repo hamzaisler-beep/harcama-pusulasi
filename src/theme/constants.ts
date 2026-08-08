@@ -5,6 +5,10 @@ import { Platform } from "react-native";
 // Web CSS'teki "Space Mono, monospace" sözdizimi native'de geçersizdir.
 export const MONO = Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" });
 
+// Kenar menüde gösterilir. Hangi sürümün yayında olduğunu bir bakışta
+// anlamak için (tarayıcı önbelleği / yayın gecikmesi teşhisi) kullanılır.
+export const APP_VERSION = "2.1.0";
+
 export const COLORS = {
   background: "#0F1117", // --bg
   card: "#171A24",       // --bg2 (Panel, Sidebar, Card)
