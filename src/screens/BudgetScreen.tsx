@@ -1,23 +1,73 @@
 // src/screens/BudgetScreen.tsx
-import React, { useMemo } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  Dimensions, 
-  Platform 
+import React, { useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  TouchableWithoutFeedback,
+  ActivityIndicator,
+  Alert,
+  Platform
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { store } from "../store";
-import { COLORS } from "../theme/constants";
+import { useStore } from "../hooks/useStore";
+import { COLORS, Budget } from "../theme/constants";
 
-const { width } = Dimensions.get("window");
+const BUDGET_CATEGORIES = ["Market", "Restoran", "Ulaşım", "Faturalar", "Eğlence", "Giyim", "Sağlık", "Diğer"];
+
+const confirmDelete = (msg: string, onYes: () => void) => {
+  if (Platform.OS === "web") {
+    if (window.confirm(msg)) onYes();
+  } else {
+    Alert.alert("Sil", msg, [
+      { text: "Vazgeç", style: "cancel" },
+      { text: "Sil", style: "destructive", onPress: onYes },
+    ]);
+  }
+};
 
 export default function BudgetScreen() {
-    const budgets = store.budgets || [];
-    const transactions = store.transactions || [];
+    const s = useStore();
+    const budgets = s.budgets || [];
+    const transactions = s.transactions || [];
+
+    const [modalOpen, setModalOpen] = useState(false);
+    const [editing, setEditing] = useState<Budget | null>(null);
+    const [category, setCategory] = useState(BUDGET_CATEGORIES[0]);
+    const [limit, setLimit] = useState("");
+    const [saving, setSaving] = useState(false);
+
+    const openAdd = () => {
+        setEditing(null);
+        setCategory(BUDGET_CATEGORIES[0]);
+        setLimit("");
+        setModalOpen(true);
+    };
+
+    const openEdit = (b: Budget) => {
+        setEditing(b);
+        setCategory(b.category);
+        setLimit(String(b.limit));
+        setModalOpen(true);
+    };
+
+    const handleSave = async () => {
+        if (!category || !limit) return;
+        setSaving(true);
+        try {
+            const payload = { category, limit: Number(limit) || 0, period: "monthly" as const };
+            if (editing) await store.updateBudget(editing.id, payload);
+            else await store.addBudget(payload);
+            setModalOpen(false);
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const stats = useMemo(() => {
         let totalLimit = budgets.reduce((acc, b) => acc + (b.limit || 0), 0);
@@ -52,7 +102,7 @@ export default function BudgetScreen() {
                     <Text style={styles.title}>Bütçe Yönetimi</Text>
                     <Text style={styles.subtitle}>Harcanan vs Bütçe limitleriniz</Text>
                 </View>
-                <TouchableOpacity style={styles.addBtn}>
+                <TouchableOpacity style={styles.addBtn} onPress={openAdd}>
                     <MaterialIcons name="add" size={20} color="#fff" />
                     <Text style={styles.addBtnText}>Bütçe Ekle</Text>
                 </TouchableOpacity>
@@ -88,7 +138,7 @@ export default function BudgetScreen() {
                 <View style={[styles.card, { flex: 1.5 }]}>
                     <View style={styles.cardHeader}>
                         <Text style={styles.cardTitle}>KATEGORİ LİMİTLERİ</Text>
-                        <TouchableOpacity><Text style={styles.editLink}>Düzenle</Text></TouchableOpacity>
+                        <TouchableOpacity onPress={openAdd}><Text style={styles.editLink}>+ Ekle</Text></TouchableOpacity>
                     </View>
                     <ScrollView style={styles.catList} showsVerticalScrollIndicator={false}>
                         {stats.categoryStats.length === 0 ? (
@@ -113,6 +163,14 @@ export default function BudgetScreen() {
                                                 <Text style={styles.catLimit}>Limit: ₺{cat.limit}</Text>
                                             </View>
                                         </View>
+                                        <View style={styles.rowActions}>
+                                            <TouchableOpacity onPress={() => openEdit(cat)} style={styles.iconMini}>
+                                                <MaterialIcons name="edit" size={16} color={COLORS.textMuted} />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => confirmDelete(`"${cat.category}" bütçesini silmek istiyor musunuz?`, () => store.deleteBudget(cat.id))} style={styles.iconMini}>
+                                                <MaterialIcons name="delete-outline" size={16} color={COLORS.textMuted} />
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
                                 </View>
                             ))
@@ -128,6 +186,34 @@ export default function BudgetScreen() {
                     <SideBySideBarChart data={stats.categoryStats} />
                 </View>
             </View>
+
+            {/* Ekle / Düzenle Modal */}
+            <Modal visible={modalOpen} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <TouchableWithoutFeedback onPress={() => setModalOpen(false)}>
+                        <View style={StyleSheet.absoluteFill} />
+                    </TouchableWithoutFeedback>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>{editing ? "Bütçeyi Düzenle" : "Yeni Bütçe"}</Text>
+
+                        <Text style={styles.fieldLabel}>Kategori</Text>
+                        <View style={styles.catChips}>
+                            {BUDGET_CATEGORIES.map((c) => (
+                                <TouchableOpacity key={c} style={[styles.catChip, category === c && styles.catChipActive]} onPress={() => setCategory(c)} disabled={!!editing}>
+                                    <Text style={[styles.catChipText, category === c && { color: "#fff" }]}>{c}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <Text style={styles.fieldLabel}>Aylık Limit (₺)</Text>
+                        <TextInput style={styles.modalInput} value={limit} onChangeText={setLimit} keyboardType="numeric" placeholder="0" placeholderTextColor={COLORS.textMuted} />
+
+                        <TouchableOpacity style={[styles.modalSaveBtn, saving && { opacity: 0.7 }]} onPress={handleSave} disabled={saving}>
+                            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSaveText}>{editing ? "Güncelle" : "Kaydet"}</Text>}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </ScrollView>
     );
 }
@@ -210,6 +296,20 @@ const styles = StyleSheet.create({
   catValues: { flexDirection: "row", justifyContent: "space-between" },
   catSpent: { fontSize: 12, color: COLORS.text, fontWeight: "700" },
   catLimit: { fontSize: 11, color: COLORS.textMuted },
+  rowActions: { flexDirection: "row", alignItems: "center" },
+  iconMini: { padding: 6 },
+
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center", padding: 20 },
+  modalContent: { width: "100%", maxWidth: 460, backgroundColor: COLORS.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: COLORS.border },
+  modalTitle: { fontSize: 20, fontWeight: "800", color: "#fff", marginBottom: 20 },
+  fieldLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: "700", marginBottom: 8, marginTop: 8 },
+  catChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  catChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: COLORS.border },
+  catChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  catChipText: { color: COLORS.textMuted, fontWeight: "700", fontSize: 12 },
+  modalInput: { backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 16, color: "#fff", fontSize: 20, fontWeight: "800", borderWidth: 1, borderColor: COLORS.border },
+  modalSaveBtn: { backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 24 },
+  modalSaveText: { color: "#fff", fontSize: 15, fontWeight: "800" },
 
   emptyText: { color: COLORS.textMuted, textAlign: "center", marginTop: 40 },
 
