@@ -24,17 +24,49 @@ git push -u origin main
 3. **Build & Output Settings** kısmının şu şekilde olduğundan emin olun (Otomatik gelmeli):
    - **Build Command:** `npx expo export -p web`
    - **Output Directory:** `dist`
-4. **Environment Variables** bölümüne `.env` dosyanızdaki tüm değişkenleri ekleyin (EXPO_PUBLIC_ ile başlayanlar).
+4. **Environment Variables** bölümüne aşağıdaki Firebase değişkenlerini ekleyin (opsiyonel — ayarlanmazsa kod içindeki varsayılan projeye düşer):
+
+```
+EXPO_PUBLIC_FIREBASE_API_KEY=...
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=...
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+EXPO_PUBLIC_FIREBASE_APP_ID=...
+```
 
 ## ✨ Özellikler
-- **Premium Dashboard**: SVG tabanlı animasyonlu grafikler.
+- **Dashboard**: Gerçek verilere dayalı SVG grafikler — son 6 ay gelir/gider, kategori dağılımı, bu ayki bütçe durumu, birikim özeti.
 - **İşlemler**: Tarih aralığı filtreli, Excel/CSV ekstre yükleme destekli.
-- **Yatırımlar**: Portföy dağılımı ve performans takibi.
+- **Hesaplar**: Nakit/banka/kart bakiyeleri, toplam varlık, ekle-düzenle-sil.
+- **Bütçe**: Kategori limitleri, harcama karşılaştırması.
 - **Faturalar**: Dinamik işlem takipli fatura yönetim paneli.
-- **Firebase Sync**: Tüm verileriniz bulutta güvende.
+- **Yatırımlar**: Portföy dağılımı ve performans takibi.
+- **Hedefler**: Birikim hedefleri ve ilerleme takibi.
+- **Borç / Alacak**: Verecek/alacak kayıtları, kapatma ve net durum.
+- **Döviz & Kur**: Canlı kurlar (open.er-api.com) ve para birimi çevirici.
+- **Vergi**: KDV ve gelir vergisi hesaplayıcıları.
+- **Raporlar**: İşlem geçmişine dayalı trend ve kategori analizi.
+- **Firebase Sync**: Tüm verileriniz bulutta, gerçek zamanlı senkron.
+- **Responsive**: Masaüstünde sabit kenar menü, mobilde kayan drawer navigasyon.
 
 ## 🛠️ Yerel Geliştirme
 ```bash
 npm install
-npm run web
+npm run web        # web'de çalıştır
+npx tsc --noEmit   # tip kontrolü
+npm run build      # üretim web derlemesi (dist/)
+```
+
+## 📁 Proje Yapısı
+```
+src/
+  components/   Sidebar (paylaşılan navigasyon)
+  hooks/        useStore (reaktif store aboneliği)
+  navigation/   RootNavigator (auth yönlendirmesi)
+  screens/      Tüm ekranlar
+  services/     firebase.ts (env tabanlı config)
+  store/        Firestore canlı senkron + CRUD
+  theme/        Renkler ve tipler
+  utils/        format.ts (para/ikon yardımcıları)
 ```
