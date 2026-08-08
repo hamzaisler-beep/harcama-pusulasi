@@ -14,9 +14,20 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import Svg, { Circle, Rect } from "react-native-svg";
+import { format, subMonths, startOfMonth, parseISO } from "date-fns";
+import { tr } from "date-fns/locale";
 import { store } from "../store";
 import { auth } from "../services/firebase";
 import { COLORS, RADII, Transaction } from "../theme/constants";
+import { formatTRY } from "../utils/format";
+
+const monthKey = (d: string) => {
+  try {
+    return format(d.includes("T") ? parseISO(d) : new Date(d), "yyyy-MM");
+  } catch {
+    return "";
+  }
+};
 
 // Import Placeholder Screens
 import TransactionsScreen from "./TransactionsScreen";
@@ -48,27 +59,84 @@ export default function DashboardScreen() {
     auth.signOut();
   };
 
-  const stats = useMemo(() => {
-    const income = store.transactions
-        .filter(t => t.type === "income")
-        .reduce((s, t) => {
-            const val = Number(t.amount || 0);
-            return s + (isNaN(val) ? 0 : val);
-        }, 0);
-    const expense = store.transactions
-        .filter(t => t.type === "expense")
-        .reduce((s, t) => {
-            const val = Math.abs(Number(t.amount || 0));
-            return s + (isNaN(val) ? 0 : val);
-        }, 0);
-    const balance = income - expense;
-    return { 
-        income: isNaN(income) ? 0 : income, 
-        expense: isNaN(expense) ? 0 : expense, 
-        balance: isNaN(balance) ? 0 : balance, 
-        savings: 177500 
-    }; 
-  }, [store.transactions, tick]);
+  const data = useMemo(() => {
+    const txs = store.transactions;
+    const now = new Date();
+    const thisKey = format(now, "yyyy-MM");
+    const lastKey = format(subMonths(now, 1), "yyyy-MM");
+
+    let incThis = 0, expThis = 0, incLast = 0, expLast = 0, incAll = 0, expAll = 0;
+    const catTotals: Record<string, number> = {};
+
+    txs.forEach((t) => {
+      const val = Math.abs(Number(t.amount) || 0);
+      if (isNaN(val)) return;
+      const k = monthKey(t.date);
+      if (t.type === "income") {
+        incAll += val;
+        if (k === thisKey) incThis += val;
+        if (k === lastKey) incLast += val;
+      } else {
+        expAll += val;
+        if (k === thisKey) expThis += val;
+        if (k === lastKey) expLast += val;
+        const cat = t.category || "Diğer";
+        catTotals[cat] = (catTotals[cat] || 0) + val;
+      }
+    });
+
+    // Son 6 ay
+    const monthly: { key: string; label: string; income: number; expense: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = startOfMonth(subMonths(now, i));
+      monthly.push({ key: format(d, "yyyy-MM"), label: format(d, "MMM", { locale: tr }), income: 0, expense: 0 });
+    }
+    const mmap = new Map(monthly.map((m) => [m.key, m]));
+    txs.forEach((t) => {
+      const m = mmap.get(monthKey(t.date));
+      if (!m) return;
+      const val = Math.abs(Number(t.amount) || 0);
+      if (t.type === "income") m.income += val;
+      else m.expense += val;
+    });
+
+    // Kategori dağılımı (ilk 5 gider)
+    const CAT_COLORS = [COLORS.expense, COLORS.info, COLORS.income, COLORS.warning, COLORS.accent2];
+    const categories = Object.entries(catTotals)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5)
+      .map((c, i) => ({ ...c, color: CAT_COLORS[i % CAT_COLORS.length] }));
+    const expenseTotal = Object.values(catTotals).reduce((s, v) => s + v, 0);
+
+    // Bu ay bütçe durumu
+    const budgetStatus = store.budgets.map((b) => {
+      const spent = txs
+        .filter((t) => t.type === "expense" && t.category === b.category && monthKey(t.date) === thisKey)
+        .reduce((s, t) => s + Math.abs(Number(t.amount) || 0), 0);
+      return { label: b.category, current: spent, total: b.limit, color: spent > b.limit ? COLORS.expense : COLORS.primary };
+    });
+
+    // Toplam birikim = hedefler + yatırım değeri
+    const goalsTotal = store.goals.reduce((s, g) => s + (Number(g.currentAmount) || 0), 0);
+    const invValue = store.investments.reduce((s, inv) => s + (Number(inv.amount) || 0) * (Number(inv.currentPrice) || 0), 0);
+
+    const pct = (cur: number, prev: number) => (prev > 0 ? Math.round(((cur - prev) / prev) * 100) : cur > 0 ? 100 : 0);
+
+    return {
+      income: incThis,
+      expense: expThis,
+      balance: incAll - expAll,
+      savings: goalsTotal + invValue,
+      incomeDelta: pct(incThis, incLast),
+      expenseDelta: pct(expThis, expLast),
+      monthly,
+      categories,
+      expenseTotal,
+      budgetStatus,
+      goalsCount: store.goals.length,
+    };
+  }, [store.transactions, store.budgets, store.goals, store.investments, tick]);
 
   const Sidebar = () => (
     <View style={styles.sidebar}>
@@ -138,7 +206,7 @@ export default function DashboardScreen() {
         case "Döviz & Kur": return <CurrencyScreen />;
         case "Vergi": return <TaxScreen />;
         case "Raporlar": return <ReportsScreen />;
-        default: return <DashboardMain stats={stats} transactions={store.transactions} />;
+        default: return <DashboardMain data={data} transactions={store.transactions} />;
     }
   };
 
@@ -194,34 +262,27 @@ const ProfileMenuItem = ({ icon, label, onPress }: any) => (
     </TouchableOpacity>
 );
 
-const DashboardMain = ({ stats, transactions }: { stats: any, transactions: Transaction[] }) => {
+const DashboardMain = ({ data, transactions }: { data: any, transactions: Transaction[] }) => {
+    const deltaText = (d: number) => (d === 0 ? "Değişim yok" : `${d > 0 ? "+" : ""}${d}% geçen ay`);
     return (
         <ScrollView style={styles.content} contentContainerStyle={styles.scrollInside}>
             {/* Top Stat Row */}
             <View style={styles.statRow}>
-                <StatBox title="Bu Ay Gelir" value={stats.income} color={COLORS.income} sub="+31% geçen ay" icon="payments" />
-                <StatBox title="Bu Ay Gider" value={stats.expense} color={COLORS.expense} sub="+96% geçen ay" icon="shopping-cart" />
-                <StatBox title="Net Bakiye" value={stats.balance} color={COLORS.warning} sub="Olumlu" icon="account-balance-wallet" />
-                <StatBox title="Toplam Birikim" value={stats.savings} color={COLORS.primary} sub="4 aktif hedef" icon="savings" />
+                <StatBox title="Bu Ay Gelir" value={data.income} color={COLORS.income} sub={deltaText(data.incomeDelta)} icon="payments" />
+                <StatBox title="Bu Ay Gider" value={data.expense} color={COLORS.expense} sub={deltaText(data.expenseDelta)} icon="shopping-cart" />
+                <StatBox title="Net Bakiye" value={data.balance} color={COLORS.warning} sub={data.balance >= 0 ? "Olumlu" : "Negatif"} icon="account-balance-wallet" />
+                <StatBox title="Toplam Birikim" value={data.savings} color={COLORS.primary} sub={`${data.goalsCount} aktif hedef`} icon="savings" />
             </View>
 
             {/* Charts Row */}
             <View style={styles.chartsRow}>
                 <View style={[styles.panel, { flex: 1 }]}>
                     <Text style={styles.panelTitle}>AYLIK GELİR / GİDER</Text>
-                    <CustomBarChart income={stats.income} expense={stats.expense} />
+                    <CustomBarChart monthly={data.monthly} />
                 </View>
                 <View style={[styles.panel, { flex: 0.8 }]}>
                     <Text style={styles.panelTitle}>KATEGORİ DAĞILIMI</Text>
-                    <CustomDoughnut 
-                        data={[
-                            { label: "Market", value: 2800, color: COLORS.expense },
-                            { label: "Giyim", value: 1800, color: COLORS.info },
-                            { label: "Ulaşım", value: 1200, color: COLORS.income },
-                            { label: "Faturalar", value: 680, color: COLORS.warning },
-                            { label: "Restoran", value: 450, color: COLORS.accent2 },
-                        ]} 
-                    />
+                    <CustomDoughnut data={data.categories} total={data.expenseTotal} />
                 </View>
             </View>
 
@@ -230,19 +291,23 @@ const DashboardMain = ({ stats, transactions }: { stats: any, transactions: Tran
                 <View style={[styles.panel, { flex: 1 }]}>
                     <Text style={styles.panelTitle}>SON İŞLEMLER</Text>
                     <View style={styles.txnList}>
-                        {transactions.slice(0, 6).map((tx) => (
-                            <TxnItem key={tx.id} tx={tx} />
-                        ))}
+                        {transactions.length === 0 ? (
+                            <Text style={styles.emptyHint}>Henüz işlem yok.</Text>
+                        ) : (
+                            transactions.slice(0, 6).map((tx) => <TxnItem key={tx.id} tx={tx} />)
+                        )}
                     </View>
                 </View>
 
                 <View style={[styles.panel, { flex: 0.8 }]}>
-                    <Text style={styles.panelTitle}>BÜTÇE DURUMU</Text>
-                    <BudgetProgress label="Market" current={2800} total={3000} color={COLORS.expense} />
-                    <BudgetProgress label="Restoran" current={450} total={1500} color={COLORS.income} />
-                    <BudgetProgress label="Ulaşım" current={1200} total={2000} color={COLORS.info} />
-                    <BudgetProgress label="Eğlence" current={139} total={1000} color={COLORS.accent2} />
-                    <BudgetProgress label="Giyim" current={1800} total={2000} color={COLORS.expense} />
+                    <Text style={styles.panelTitle}>BÜTÇE DURUMU (BU AY)</Text>
+                    {data.budgetStatus.length === 0 ? (
+                        <Text style={styles.emptyHint}>Bütçe tanımlanmadı. "Bütçe" sekmesinden ekleyebilirsiniz.</Text>
+                    ) : (
+                        data.budgetStatus.map((b: any) => (
+                            <BudgetProgress key={b.label} label={b.label} current={b.current} total={b.total} color={b.color} />
+                        ))
+                    )}
                 </View>
             </View>
         </ScrollView>
@@ -251,27 +316,24 @@ const DashboardMain = ({ stats, transactions }: { stats: any, transactions: Tran
 
 // --- Custom Components (Cross-Platform Safe) ---
 
-const CustomBarChart = ({ income, expense }: any) => {
-    const months = ["Eylül", "Ekim", "Kasım", "Aralık", "Ocak", "Şubat"];
-    const safeInc = Number(income) || 0;
-    const safeExp = Number(expense) || 0;
-    const maxVal = Math.max(safeInc, safeExp, 50000);
+const CustomBarChart = ({ monthly }: any) => {
+    const maxVal = Math.max(...monthly.map((m: any) => Math.max(m.income, m.expense)), 1);
 
     return (
         <View style={styles.barChartContainer}>
             <View style={styles.barChartDrawArea}>
-                {months.map((m, i) => {
-                    const isCurrent = m === "Şubat";
-                    const incH = i === 5 ? ((safeInc / maxVal) * 100) : (20 + Math.random() * 50);
-                    const expH = i === 5 ? ((safeExp / maxVal) * 100) : (10 + Math.random() * 40);
-                    
+                {monthly.map((m: any, i: number) => {
+                    const isCurrent = i === monthly.length - 1;
+                    const incH = (m.income / maxVal) * 100;
+                    const expH = (m.expense / maxVal) * 100;
+
                     return (
-                        <View key={m} style={styles.barGroup}>
+                        <View key={m.key} style={styles.barGroup}>
                             <View style={styles.barsContainer}>
-                                <View style={[styles.bar, { height: `${isNaN(incH) ? 0 : incH}%`, backgroundColor: COLORS.income, opacity: isCurrent ? 1 : 0.3 }]} />
-                                <View style={[styles.bar, { height: `${isNaN(expH) ? 0 : expH}%`, backgroundColor: COLORS.expense, opacity: isCurrent ? 1 : 0.3 }]} />
+                                <View style={[styles.bar, { height: `${isNaN(incH) ? 0 : incH}%`, backgroundColor: COLORS.income, opacity: isCurrent ? 1 : 0.4 }]} />
+                                <View style={[styles.bar, { height: `${isNaN(expH) ? 0 : expH}%`, backgroundColor: COLORS.expense, opacity: isCurrent ? 1 : 0.4 }]} />
                             </View>
-                            <Text style={styles.barLabel}>{m.substring(0, 3)}</Text>
+                            <Text style={styles.barLabel}>{m.label}</Text>
                         </View>
                     );
                 })}
@@ -284,16 +346,23 @@ const CustomBarChart = ({ income, expense }: any) => {
     );
 };
 
-const CustomDoughnut = ({ data }: any) => {
-    const total = data.reduce((s: any, i: any) => s + i.value, 0);
+const CustomDoughnut = ({ data, total }: any) => {
+    if (!data || data.length === 0) {
+        return (
+            <View style={styles.doughnutContainer}>
+                <Text style={styles.emptyHint}>Bu ay gider kaydı yok.</Text>
+            </View>
+        );
+    }
+    const sum = data.reduce((s: any, i: any) => s + i.value, 0) || 1;
     let startAngle = 0;
 
     return (
         <View style={styles.doughnutContainer}>
             <View style={styles.doughnutRelative}>
                 <Svg viewBox="0 0 100 100" style={styles.svg}>
-                    {data.map((item: any, i: number) => {
-                        const percentage = (item.value / total) * 100;
+                    {data.map((item: any) => {
+                        const percentage = (item.value / sum) * 100;
                         const dashArray = `${percentage} ${100 - percentage}`;
                         const dashOffset = -startAngle;
                         startAngle += percentage;
@@ -314,8 +383,8 @@ const CustomDoughnut = ({ data }: any) => {
                     })}
                 </Svg>
                 <View style={styles.doughnutCenter}>
-                    <Text style={styles.doughnutCenterText}>Faturalar</Text>
-                    <Text style={styles.doughnutCenterSub}>₺680</Text>
+                    <Text style={styles.doughnutCenterText}>Toplam Gider</Text>
+                    <Text style={styles.doughnutCenterSub}>{formatTRY(total)}</Text>
                 </View>
             </View>
             <View style={styles.doughnutLegend}>
@@ -362,12 +431,12 @@ const BudgetProgress = ({ label, current, total, color }: any) => (
     <View style={styles.budgetRow}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
             <Text style={{ color: '#E2E8F0', fontSize: 13, fontWeight: '600' }}>{label}</Text>
-            <Text style={{ color: '#718096', fontSize: 11 }}>₺{current} / ₺{total}</Text>
+            <Text style={{ color: '#718096', fontSize: 11 }}>{formatTRY(current)} / {formatTRY(total)}</Text>
         </View>
         <View style={{ height: 6, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
-            <View style={{ 
-                height: '100%', 
-                width: `${Math.min((current/total)*100, 100)}%`, 
+            <View style={{
+                height: '100%',
+                width: `${total > 0 ? Math.min((current/total)*100, 100) : 0}%`,
                 backgroundColor: color, 
                 borderRadius: 3
             }} />
@@ -434,6 +503,7 @@ const styles = StyleSheet.create({
   doughnutLegend: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 12, marginTop: 24 },
 
   budgetRow: { marginBottom: 20 },
+  emptyHint: { color: COLORS.textMuted, fontSize: 13, textAlign: "center", paddingVertical: 24, lineHeight: 19 },
 
   // Profile Modal Styles
   profileModalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.3)" },
