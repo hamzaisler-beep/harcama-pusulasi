@@ -64,7 +64,24 @@ npm run android    # bağlı Android cihaz/emülatör
 npm run ios        # macOS + iOS simülatör
 ```
 
-### Kurulabilir uygulama (APK / App Store) — EAS Build
+### Kurulabilir APK — GitHub Actions (hesap gerekmez) ✅
+
+Her push'ta **otomatik olarak kurulabilir bir APK** derlenir. Hiçbir kurulum,
+Expo hesabı veya ücretli abonelik gerekmez.
+
+**İndirme adımları:**
+1. Depodaki **Actions** sekmesine gidin →
+   [Android APK Derle](../../actions/workflows/build-android.yml)
+2. En üstteki yeşil ✅ derlemeye tıklayın.
+3. Sayfanın altındaki **Artifacts** bölümünden `HarcamaPusulasi-apk` dosyasını indirin.
+4. İnen `.zip`'i açın → içinden `HarcamaPusulasi.apk` çıkar.
+5. APK'yı telefonunuza atıp kurun. Android "bilinmeyen kaynak" uyarısı verirse
+   *"Yine de yükle"* deyin (uygulama kendi kendine imzalandığı için normaldir).
+
+> Artifact'ler 30 gün saklanır. Derleme yalnızca `arm64-v8a` mimarisi için
+> yapılır — 2016 sonrası tüm Android telefonları kapsar.
+
+### Mağaza dağıtımı (Play Store / App Store) — EAS Build
 Bağımsız `.apk`/`.aab` veya mağaza derlemesi için [EAS Build](https://docs.expo.dev/build/introduction/) kullanılır (ücretsiz Expo hesabı yeterlidir):
 ```bash
 npm install -g eas-cli
