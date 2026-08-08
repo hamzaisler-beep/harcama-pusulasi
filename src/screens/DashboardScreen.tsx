@@ -5,11 +5,12 @@ import {
   Text, 
   StyleSheet, 
   ScrollView, 
-  TouchableOpacity, 
-  Dimensions, 
+  TouchableOpacity,
+  Dimensions,
   Platform,
   Modal,
-  TouchableWithoutFeedback
+  TouchableWithoutFeedback,
+  useWindowDimensions
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -41,13 +42,16 @@ import CurrencyScreen from "./CurrencyScreen";
 import TaxScreen from "./TaxScreen";
 import ReportsScreen from "./ReportsScreen";
 
-const { width } = Dimensions.get("window");
-const isWeb = Platform.OS === "web" || width > 1024;
+import Sidebar from "../components/Sidebar";
 
 export default function DashboardScreen() {
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 900;
+
   const [tick, setTick] = useState(0);
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     const fn = () => setTick(t => t + 1);
@@ -138,60 +142,9 @@ export default function DashboardScreen() {
     };
   }, [store.transactions, store.budgets, store.goals, store.investments, tick]);
 
-  const Sidebar = () => (
-    <View style={styles.sidebar}>
-      <View style={styles.sidebarHeader}>
-        <TouchableOpacity style={styles.userCardTop} onPress={() => setIsProfileModalVisible(true)}>
-            <View style={styles.avatar}>
-                <Text style={{ color: "#000", fontWeight: "700" }}>
-                  {(auth.currentUser?.displayName || auth.currentUser?.email || "K").substring(0, 2).toUpperCase()}
-                </Text>
-            </View>
-            <View style={{ flex: 1 }}>
-                <Text style={styles.userName} numberOfLines={1}>
-                  {auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || "Kullanıcı"}
-                </Text>
-                <Text style={styles.settingsLinkText}>Hesap ve Profil</Text>
-            </View>
-            <MaterialIcons name="more-vert" size={20} color={COLORS.textMuted} />
-        </TouchableOpacity>
-      </View>
-      <View style={styles.navSection}>
-        <Text style={styles.navSectionTitle}>ANA MENÜ</Text>
-        <SidebarItem icon="dashboard" label="Dashboard" target="Dashboard" />
-        <SidebarItem icon="swap-vert" label="İşlemler" target="İşlemler" />
-        <SidebarItem icon="account-balance" label="Hesaplar" target="Hesaplar" />
-        <SidebarItem icon="pie-chart" label="Bütçe" target="Bütçe" />
-        <SidebarItem icon="receipt" label="Faturalar" target="Faturalar" />
-      </View>
-
-      <View style={styles.navSection}>
-        <Text style={styles.navSectionTitle}>YATIRIM & HEDEF</Text>
-        <SidebarItem icon="trending-up" label="Yatırımlar" target="Yatırımlar" />
-        <SidebarItem icon="flag" label="Hedefler" target="Hedefler" />
-        <SidebarItem icon="handshake" label="Borç / Alacak" target="Borç / Alacak" />
-        <SidebarItem icon="currency-exchange" label="Döviz & Kur" target="Döviz & Kur" />
-        <SidebarItem icon="list-alt" label="Vergi" target="Vergi" />
-      </View>
-
-      <View style={styles.navSection}>
-        <Text style={styles.navSectionTitle}>ANALİZ</Text>
-        <SidebarItem icon="bar-chart" label="Raporlar" target="Raporlar" />
-      </View>
-    </View>
-  );
-
-  const SidebarItem = ({ icon, label, target }: any) => {
-    const active = activeTab === target;
-    return (
-        <TouchableOpacity 
-            onPress={() => setActiveTab(target)}
-            style={[styles.navItem, active && styles.navItemActive]}
-        >
-            <MaterialIcons name={icon} size={20} color={active ? "#10b981" : COLORS.textSecondary} />
-            <Text style={[styles.navItemLabel, active && styles.activeNavLabel]}>{label}</Text>
-        </TouchableOpacity>
-    );
+  const handleSelect = (target: string) => {
+    setActiveTab(target);
+    setDrawerOpen(false);
   };
 
   const renderContent = () => {
@@ -206,18 +159,47 @@ export default function DashboardScreen() {
         case "Döviz & Kur": return <CurrencyScreen />;
         case "Vergi": return <TaxScreen />;
         case "Raporlar": return <ReportsScreen />;
-        default: return <DashboardMain data={data} transactions={store.transactions} />;
+        default: return <DashboardMain data={data} transactions={store.transactions} isDesktop={isDesktop} />;
     }
   };
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
-        {isWeb && <Sidebar />}
+        {isDesktop && (
+          <Sidebar activeTab={activeTab} onSelect={handleSelect} onProfilePress={() => setIsProfileModalVisible(true)} />
+        )}
         <View style={styles.mainContentContainer}>
-            {renderContent()}
+          {!isDesktop && (
+            <View style={styles.mobileHeader}>
+              <TouchableOpacity onPress={() => setDrawerOpen(true)} style={styles.menuBtn}>
+                <MaterialIcons name="menu" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+              <Text style={styles.mobileTitle} numberOfLines={1}>{activeTab}</Text>
+              <TouchableOpacity onPress={() => setIsProfileModalVisible(true)} style={styles.mobileAvatar}>
+                <Text style={{ color: "#000", fontWeight: "700", fontSize: 12 }}>
+                  {(auth.currentUser?.displayName || auth.currentUser?.email || "K").substring(0, 2).toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {renderContent()}
         </View>
       </View>
+
+      {/* Mobil Drawer */}
+      {!isDesktop && (
+        <Modal visible={drawerOpen} transparent animationType="slide">
+          <View style={styles.drawerOverlay}>
+            <View style={styles.drawerPanel}>
+              <Sidebar activeTab={activeTab} onSelect={handleSelect} onProfilePress={() => { setDrawerOpen(false); setIsProfileModalVisible(true); }} />
+            </View>
+            <TouchableWithoutFeedback onPress={() => setDrawerOpen(false)}>
+              <View style={styles.drawerBackdrop} />
+            </TouchableWithoutFeedback>
+          </View>
+        </Modal>
+      )}
 
       {/* Profile Settings Modal */}
       <Modal visible={isProfileModalVisible} transparent animationType="fade">
@@ -262,10 +244,12 @@ const ProfileMenuItem = ({ icon, label, onPress }: any) => (
     </TouchableOpacity>
 );
 
-const DashboardMain = ({ data, transactions }: { data: any, transactions: Transaction[] }) => {
+const DashboardMain = ({ data, transactions, isDesktop }: { data: any, transactions: Transaction[], isDesktop: boolean }) => {
     const deltaText = (d: number) => (d === 0 ? "Değişim yok" : `${d > 0 ? "+" : ""}${d}% geçen ay`);
+    const stackCol = !isDesktop && { flexDirection: "column" as const };
+    const panelFull = isDesktop ? null : { width: "100%" as const, flex: undefined, marginBottom: 16 };
     return (
-        <ScrollView style={styles.content} contentContainerStyle={styles.scrollInside}>
+        <ScrollView style={styles.content} contentContainerStyle={[styles.scrollInside, !isDesktop && { padding: 16 }]}>
             {/* Top Stat Row */}
             <View style={styles.statRow}>
                 <StatBox title="Bu Ay Gelir" value={data.income} color={COLORS.income} sub={deltaText(data.incomeDelta)} icon="payments" />
@@ -275,20 +259,20 @@ const DashboardMain = ({ data, transactions }: { data: any, transactions: Transa
             </View>
 
             {/* Charts Row */}
-            <View style={styles.chartsRow}>
-                <View style={[styles.panel, { flex: 1 }]}>
+            <View style={[styles.chartsRow, stackCol]}>
+                <View style={[styles.panel, { flex: 1 }, panelFull]}>
                     <Text style={styles.panelTitle}>AYLIK GELİR / GİDER</Text>
                     <CustomBarChart monthly={data.monthly} />
                 </View>
-                <View style={[styles.panel, { flex: 0.8 }]}>
+                <View style={[styles.panel, { flex: 0.8 }, panelFull]}>
                     <Text style={styles.panelTitle}>KATEGORİ DAĞILIMI</Text>
                     <CustomDoughnut data={data.categories} total={data.expenseTotal} />
                 </View>
             </View>
 
             {/* Bottom Panels */}
-            <View style={styles.panelGrid}>
-                <View style={[styles.panel, { flex: 1 }]}>
+            <View style={[styles.panelGrid, stackCol]}>
+                <View style={[styles.panel, { flex: 1 }, panelFull]}>
                     <Text style={styles.panelTitle}>SON İŞLEMLER</Text>
                     <View style={styles.txnList}>
                         {transactions.length === 0 ? (
@@ -299,7 +283,7 @@ const DashboardMain = ({ data, transactions }: { data: any, transactions: Transa
                     </View>
                 </View>
 
-                <View style={[styles.panel, { flex: 0.8 }]}>
+                <View style={[styles.panel, { flex: 0.8 }, panelFull]}>
                     <Text style={styles.panelTitle}>BÜTÇE DURUMU (BU AY)</Text>
                     {data.budgetStatus.length === 0 ? (
                         <Text style={styles.emptyHint}>Bütçe tanımlanmadı. "Bütçe" sekmesinden ekleyebilirsiniz.</Text>
@@ -448,24 +432,22 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   container: { flex: 1, flexDirection: "row" },
   mainContentContainer: { flex: 1 },
-  sidebar: { width: 260, backgroundColor: "#0b0d12", paddingVertical: 24, borderRightWidth: 1, borderColor: COLORS.border },
-  sidebarHeader: { paddingHorizontal: 16, marginBottom: 32 },
-  userCardTop: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#78dcc8", alignItems: "center", justifyContent: "center" },
-  userName: { color: "#fff", fontSize: 14, fontWeight: "700" },
-  settingsLink: { marginTop: 2 },
-  settingsLinkText: { color: "#10b981", fontSize: 11, fontWeight: "600" },
-  navSection: { marginBottom: 32 },
-  navSectionTitle: { fontSize: 10, color: COLORS.textMuted, letterSpacing: 1.2, fontWeight: "700", marginBottom: 16, paddingHorizontal: 24 },
-  navItem: { flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 24, marginBottom: 4, gap: 14 },
-  navItemActive: { backgroundColor: "rgba(16, 185, 129, 0.08)", borderLeftWidth: 4, borderLeftColor: "#10b981" },
-  navItemLabel: { color: COLORS.textSecondary, fontSize: 14, fontWeight: "600" },
-  activeNavLabel: { color: "#10b981" },
+
+  // Mobil üst bar
+  mobileHeader: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, height: 56, borderBottomWidth: 1, borderColor: COLORS.border, backgroundColor: "#0b0d12" },
+  menuBtn: { padding: 4 },
+  mobileTitle: { flex: 1, color: "#fff", fontSize: 17, fontWeight: "800" },
+  mobileAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#78dcc8", alignItems: "center", justifyContent: "center" },
+
+  // Mobil drawer
+  drawerOverlay: { flex: 1, flexDirection: "row" },
+  drawerPanel: { width: 280, maxWidth: "82%", height: "100%" },
+  drawerBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },
 
   content: { flex: 1 },
   scrollInside: { padding: 32 },
-  statRow: { flexDirection: "row", gap: 16, marginBottom: 24 },
-  statBox: { flex: 1, backgroundColor: COLORS.card, borderRadius: 10, padding: 20, borderTopWidth: 3, position: "relative", minHeight: 120 },
+  statRow: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginBottom: 24 },
+  statBox: { flexGrow: 1, flexBasis: 150, minWidth: 150, backgroundColor: COLORS.card, borderRadius: 10, padding: 20, borderTopWidth: 3, position: "relative", minHeight: 120 },
   statBoxTitle: { fontSize: 12, color: COLORS.textMuted, fontWeight: "600", marginBottom: 10 },
   statBoxValue: { fontSize: 26, fontWeight: "800", marginBottom: 6, fontFamily: "monospace" },
   statBoxSub: { fontSize: 11, color: COLORS.textMuted },

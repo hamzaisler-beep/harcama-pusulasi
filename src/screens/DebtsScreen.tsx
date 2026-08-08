@@ -231,8 +231,8 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1 },
   statValue: { fontSize: 22, fontWeight: "900", marginTop: 8, fontFamily: Platform.OS === "web" ? "monospace" : undefined },
 
-  grid: { flexDirection: "row", gap: 24 },
-  panel: { backgroundColor: COLORS.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: COLORS.border },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 24 },
+  panel: { minWidth: 300, backgroundColor: COLORS.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: COLORS.border },
   panelHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   panelTitle: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1.2 },
   smallAdd: { flexDirection: "row", alignItems: "center", gap: 4 },

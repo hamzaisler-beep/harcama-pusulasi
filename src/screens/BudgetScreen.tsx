@@ -266,8 +266,8 @@ const styles = StyleSheet.create({
   addBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: COLORS.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
   addBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
 
-  grid: { flexDirection: "row", gap: 24 },
-  card: { backgroundColor: COLORS.card, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.border },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 24 },
+  card: { minWidth: 300, backgroundColor: COLORS.card, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.border },
   summaryCard: { flex: 1, justifyContent: "space-between", minHeight: 300 },
   cardTitle: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1.2, marginBottom: 24 },
   
