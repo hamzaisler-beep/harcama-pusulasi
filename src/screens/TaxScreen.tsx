@@ -1,7 +1,7 @@
 // src/screens/TaxScreen.tsx
 import React, { useMemo, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform } from "react-native";
-import { COLORS } from "../theme/constants";
+import { COLORS, MONO } from "../theme/constants";
 import { formatTRY } from "../utils/format";
 
 // 2025 Gelir Vergisi Tarifesi (genel/ücret dışı) - referans amaçlı
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   resultList: { marginTop: 24, gap: 4 },
   resultRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.03)" },
   resultLabel: { color: COLORS.textSecondary, fontSize: 13 },
-  resultValue: { color: COLORS.text, fontSize: 15, fontWeight: "800", fontFamily: Platform.OS === "web" ? "monospace" : undefined },
+  resultValue: { color: COLORS.text, fontSize: 15, fontWeight: "800", fontFamily: MONO },
 
   bracketTitle: { fontSize: 10, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1, marginTop: 24, marginBottom: 12 },
   bracketRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 },

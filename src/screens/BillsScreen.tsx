@@ -12,7 +12,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
 import { store } from "../store";
-import { COLORS } from "../theme/constants";
+import { COLORS, MONO } from "../theme/constants";
 
 const { width } = Dimensions.get("window");
 
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   statRow: { flexDirection: "row", gap: 16, marginBottom: 32 },
   statBox: { flex: 1, backgroundColor: COLORS.card, borderRadius: 16, padding: 20, flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: COLORS.border },
   statBoxTitle: { fontSize: 12, color: COLORS.textMuted, fontWeight: "600", marginBottom: 6 },
-  statBoxValue: { fontSize: 22, fontWeight: "900", fontFamily: "Space Mono, monospace" },
+  statBoxValue: { fontSize: 22, fontWeight: "900", fontFamily: MONO },
   statIconCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.03)", alignItems: "center", justifyContent: "center" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 24 },
   panel: { minWidth: 300, backgroundColor: COLORS.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: COLORS.border },
@@ -193,13 +193,13 @@ const styles = StyleSheet.create({
   billIconBoxLarge: { width: 52, height: 52, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.03)", alignItems: "center", justifyContent: "center" },
   billTitleLarge: { color: "#fff", fontSize: 16, fontWeight: "700" },
   billMetaLarge: { fontSize: 12, color: COLORS.textMuted, marginTop: 4 },
-  billAmountLarge: { color: COLORS.warning, fontSize: 18, fontWeight: "900", fontFamily: "Space Mono, monospace" },
+  billAmountLarge: { color: COLORS.warning, fontSize: 18, fontWeight: "900", fontFamily: MONO },
   billList: { gap: 12 },
   billRow: { flexDirection: "row", alignItems: "center", padding: 16, backgroundColor: "rgba(255,255,255,0.02)", borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.03)", gap: 16 },
   billIconBoxSmall: { width: 36, height: 36, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.03)", alignItems: "center", justifyContent: "center" },
   billHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
   billTitleSmall: { color: "#fff", fontSize: 14, fontWeight: "600" },
-  billAmountSmall: { color: COLORS.expense, fontSize: 14, fontWeight: "800", fontFamily: "Space Mono, monospace" },
+  billAmountSmall: { color: COLORS.expense, fontSize: 14, fontWeight: "800", fontFamily: MONO },
   billInfoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   billMetaSmall: { fontSize: 11, color: COLORS.textMuted },
   statusPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },

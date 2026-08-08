@@ -1,4 +1,10 @@
 // src/theme/index.ts
+import { Platform } from "react-native";
+
+// Platformlar arası tutarlı monospace font (rakam hizalaması için).
+// Web CSS'teki "Space Mono, monospace" sözdizimi native'de geçersizdir.
+export const MONO = Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" });
+
 export const COLORS = {
   background: "#0F1117", // --bg
   card: "#171A24",       // --bg2 (Panel, Sidebar, Card)

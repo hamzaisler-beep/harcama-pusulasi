@@ -1,7 +1,9 @@
 // src/services/firebase.ts
+import { Platform } from "react-native";
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { Auth, getAuth, initializeAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Yapılandırma öncelikle ortam değişkenlerinden (Vercel / .env) okunur.
 // Ayarlanmadıysa mevcut projeye ait değerlere geri döner; böylece
@@ -16,6 +18,28 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+
+// Auth başlatma:
+// - Web'de getAuth (tarayıcı yerel kalıcılığı otomatik).
+// - Native'de AsyncStorage ile initializeAuth → oturum uygulama kapansa
+//   bile korunur. getReactNativePersistence yalnızca Metro'nun react-native
+//   girişinde bulunduğu için dinamik require ile alınır ve web'i etkilemez.
+let authInstance: Auth;
+if (Platform.OS === "web") {
+  authInstance = getAuth(app);
+} else {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getReactNativePersistence } = require("firebase/auth");
+    authInstance = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch {
+    // Beklenmedik bir durumda (ör. persistence bulunamazsa) yine de çalış.
+    authInstance = getAuth(app);
+  }
+}
+
+export const auth = authInstance;
 export const db = getFirestore(app);
 export default app;

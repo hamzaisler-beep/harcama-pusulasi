@@ -50,12 +50,44 @@ EXPO_PUBLIC_FIREBASE_APP_ID=...
 - **Firebase Sync**: Tüm verileriniz bulutta, gerçek zamanlı senkron.
 - **Responsive**: Masaüstünde sabit kenar menü, mobilde kayan drawer navigasyon.
 
+## 📱 Mobil Uygulama (iOS & Android)
+
+Uygulama Expo/React Native ile yazıldığı için web'in yanı sıra gerçek bir mobil uygulama olarak da çalışır.
+
+### Hızlı test — Expo Go
+Telefonunuza **Expo Go** uygulamasını kurun, ardından:
+```bash
+npm install
+npm start          # QR kod çıkar; Expo Go ile taratın
+# veya
+npm run android    # bağlı Android cihaz/emülatör
+npm run ios        # macOS + iOS simülatör
+```
+
+### Kurulabilir uygulama (APK / App Store) — EAS Build
+Bağımsız `.apk`/`.aab` veya mağaza derlemesi için [EAS Build](https://docs.expo.dev/build/introduction/) kullanılır (ücretsiz Expo hesabı yeterlidir):
+```bash
+npm install -g eas-cli
+eas login
+eas build:configure
+
+# Android — doğrudan kurulabilen APK
+npm run build:android      # eas build -p android --profile preview
+
+# iOS — TestFlight/App Store (Apple Developer hesabı gerekir)
+npm run build:ios
+```
+Derleme profilleri `eas.json` içindedir: `preview` (kurulabilir APK), `production` (Play Store AAB / App Store).
+
+> **Not:** Uygulama kimliği `com.harcamapusulasi.app` (hem Android package hem iOS bundle). Kendi mağaza hesabınız için `app.json` içinden değiştirebilirsiniz. Firebase Authentication çalışması için Firebase konsolunda bu paket adını/SHA'yı ekleyin.
+
 ## 🛠️ Yerel Geliştirme
 ```bash
 npm install
 npm run web        # web'de çalıştır
 npx tsc --noEmit   # tip kontrolü
-npm run build      # üretim web derlemesi (dist/)
+npm run build:web  # üretim web derlemesi (dist/)
+npm run doctor     # proje sağlık kontrolü (expo-doctor)
 ```
 
 ## 📁 Proje Yapısı

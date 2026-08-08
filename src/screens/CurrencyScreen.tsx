@@ -11,7 +11,7 @@ import {
   Platform,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { COLORS } from "../theme/constants";
+import { COLORS, MONO } from "../theme/constants";
 import { formatNumber } from "../utils/format";
 
 // Base USD üzerinden çekilir; her para biriminin TRY karşılığı hesaplanır.
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   flag: { fontSize: 30 },
   rateCode: { color: "#fff", fontSize: 15, fontWeight: "800" },
   rateLabel: { color: COLORS.textMuted, fontSize: 11, marginTop: 2 },
-  rateValue: { color: COLORS.income, fontSize: 20, fontWeight: "900", fontFamily: Platform.OS === "web" ? "monospace" : undefined },
+  rateValue: { color: COLORS.income, fontSize: 20, fontWeight: "900", fontFamily: MONO },
 
   converter: { backgroundColor: COLORS.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: COLORS.border, maxWidth: 620 },
   convTitle: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1.2, marginBottom: 20 },
@@ -181,5 +181,5 @@ const styles = StyleSheet.create({
   pickerChipText: { color: COLORS.textMuted, fontWeight: "700", fontSize: 12 },
   resultBox: { marginTop: 24, padding: 20, borderRadius: 14, backgroundColor: "rgba(108,99,255,0.08)", borderWidth: 1, borderColor: "rgba(108,99,255,0.2)" },
   resultLabel: { color: COLORS.textSecondary, fontSize: 13 },
-  resultValue: { color: "#fff", fontSize: 28, fontWeight: "900", marginTop: 6, fontFamily: Platform.OS === "web" ? "monospace" : undefined },
+  resultValue: { color: "#fff", fontSize: 28, fontWeight: "900", marginTop: 6, fontFamily: MONO },
 });

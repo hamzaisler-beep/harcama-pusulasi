@@ -16,7 +16,7 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import Svg, { Circle } from "react-native-svg";
 import { store } from "../store";
-import { COLORS, Investment } from "../theme/constants";
+import { COLORS, MONO, Investment } from "../theme/constants";
 
 const { width } = Dimensions.get("window");
 
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   statRow: { flexDirection: "row", gap: 16, marginBottom: 32 },
   statBox: { flex: 1, backgroundColor: COLORS.card, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.border, position: 'relative', overflow: 'hidden' },
   statLabel: { fontSize: 12, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1, marginBottom: 12 },
-  statValue: { fontSize: 26, fontWeight: "900", fontFamily: "Space Mono, monospace" },
+  statValue: { fontSize: 26, fontWeight: "900", fontFamily: MONO },
   statIconBox: { position: 'absolute', right: -10, bottom: -10 },
   chartsRow: { flexDirection: "row", gap: 24, marginBottom: 32 },
   panel: { backgroundColor: COLORS.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: COLORS.border },

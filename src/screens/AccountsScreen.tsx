@@ -16,7 +16,7 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import { store } from "../store";
 import { useStore } from "../hooks/useStore";
-import { COLORS, Account } from "../theme/constants";
+import { COLORS, MONO, Account } from "../theme/constants";
 import { formatTRY } from "../utils/format";
 
 type AccType = "CASH" | "BANK" | "CARD";
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
 
   netCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.border, marginBottom: 24 },
   netLabel: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1.2 },
-  netValue: { fontSize: 34, fontWeight: "900", marginTop: 8, fontFamily: Platform.OS === "web" ? "monospace" : undefined },
+  netValue: { fontSize: 34, fontWeight: "900", marginTop: 8, fontFamily: MONO },
   netSub: { fontSize: 12, color: COLORS.textMuted, marginTop: 4 },
 
   cardsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   iconMini: { padding: 6 },
   accName: { color: "#fff", fontSize: 16, fontWeight: "700" },
   accType: { color: COLORS.textMuted, fontSize: 12, marginTop: 2 },
-  accBalance: { fontSize: 22, fontWeight: "800", marginTop: 16, fontFamily: Platform.OS === "web" ? "monospace" : undefined },
+  accBalance: { fontSize: 22, fontWeight: "800", marginTop: 16, fontFamily: MONO },
 
   emptyState: { alignItems: "center", justifyContent: "center", paddingVertical: 60 },
   emptyText: { color: COLORS.textMuted, fontSize: 14, marginTop: 16 },

@@ -16,7 +16,7 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import { store } from "../store";
 import { useStore } from "../hooks/useStore";
-import { COLORS, Budget } from "../theme/constants";
+import { COLORS, MONO, Budget } from "../theme/constants";
 
 const BUDGET_CATEGORIES = ["Market", "Restoran", "Ulaşım", "Faturalar", "Eğlence", "Giyim", "Sağlık", "Diğer"];
 
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   
   summaryFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
   footerLabel: { fontSize: 10, color: COLORS.textMuted, fontWeight: "700", marginBottom: 4 },
-  footerValue: { fontSize: 20, fontWeight: "800", fontFamily: "Space Mono, monospace" },
+  footerValue: { fontSize: 20, fontWeight: "800", fontFamily: MONO },
 
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   editLink: { fontSize: 12, color: COLORS.primary, fontWeight: "600" },

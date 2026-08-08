@@ -5,7 +5,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { format, subMonths, startOfMonth, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useStore } from "../hooks/useStore";
-import { COLORS } from "../theme/constants";
+import { COLORS, MONO } from "../theme/constants";
 import { formatTRY, getCategoryIcon } from "../utils/format";
 
 const CAT_COLORS = [COLORS.expense, COLORS.info, COLORS.income, COLORS.warning, COLORS.accent2, COLORS.primary];
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, minWidth: 180, backgroundColor: COLORS.card, borderRadius: 14, padding: 20, borderWidth: 1, borderColor: COLORS.border, borderTopWidth: 3 },
   statHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   statTitle: { fontSize: 12, color: COLORS.textMuted, fontWeight: "600" },
-  statValue: { fontSize: 22, fontWeight: "900", fontFamily: Platform.OS === "web" ? "monospace" : undefined },
+  statValue: { fontSize: 22, fontWeight: "900", fontFamily: MONO },
 
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 24 },
   panel: { minWidth: 320, backgroundColor: COLORS.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: COLORS.border },

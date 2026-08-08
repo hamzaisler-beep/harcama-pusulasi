@@ -17,7 +17,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { parseISO, differenceInCalendarDays } from "date-fns";
 import { store } from "../store";
 import { useStore } from "../hooks/useStore";
-import { COLORS, Goal } from "../theme/constants";
+import { COLORS, MONO, Goal } from "../theme/constants";
 import { formatTRY } from "../utils/format";
 
 const ICONS = ["savings", "flight", "home", "directions-car", "school", "phone-iphone", "favorite", "beach-access"];
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
 
   summaryCard: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.card, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.border, marginBottom: 24 },
   netLabel: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1.2 },
-  netValue: { fontSize: 30, fontWeight: "900", color: COLORS.income, marginTop: 8, fontFamily: Platform.OS === "web" ? "monospace" : undefined },
+  netValue: { fontSize: 30, fontWeight: "900", color: COLORS.income, marginTop: 8, fontFamily: MONO },
   netSub: { fontSize: 12, color: COLORS.textMuted, marginTop: 4 },
   bigPercentBox: { width: 84, height: 84, borderRadius: 42, borderWidth: 4, borderColor: COLORS.primary, alignItems: "center", justifyContent: "center" },
   bigPercent: { fontSize: 22, fontWeight: "900", color: "#fff" },

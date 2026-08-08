@@ -18,7 +18,7 @@ import { format, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
 import { store } from "../store";
 import { useStore } from "../hooks/useStore";
-import { COLORS, Debt } from "../theme/constants";
+import { COLORS, MONO, Debt } from "../theme/constants";
 import { formatTRY } from "../utils/format";
 
 type DebtType = "owe" | "owed";
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   statRow: { flexDirection: "row", gap: 16, marginBottom: 24 },
   statBox: { flex: 1, backgroundColor: COLORS.card, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: COLORS.border },
   statLabel: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1 },
-  statValue: { fontSize: 22, fontWeight: "900", marginTop: 8, fontFamily: Platform.OS === "web" ? "monospace" : undefined },
+  statValue: { fontSize: 22, fontWeight: "900", marginTop: 8, fontFamily: MONO },
 
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 24 },
   panel: { minWidth: 300, backgroundColor: COLORS.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: COLORS.border },
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   person: { color: "#fff", fontSize: 14, fontWeight: "700" },
   strike: { textDecorationLine: "line-through" },
   meta: { color: COLORS.textMuted, fontSize: 11, marginTop: 2 },
-  amount: { fontSize: 15, fontWeight: "800", fontFamily: Platform.OS === "web" ? "monospace" : undefined },
+  amount: { fontSize: 15, fontWeight: "800", fontFamily: MONO },
   settledTag: { fontSize: 9, color: COLORS.textMuted, marginTop: 2 },
   iconMini: { padding: 6 },
   emptyText: { color: COLORS.textMuted, fontSize: 13, textAlign: "center", paddingVertical: 24 },

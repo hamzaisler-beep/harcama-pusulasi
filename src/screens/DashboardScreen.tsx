@@ -19,7 +19,7 @@ import { format, subMonths, startOfMonth, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
 import { store } from "../store";
 import { auth } from "../services/firebase";
-import { COLORS, RADII, Transaction } from "../theme/constants";
+import { COLORS, MONO, RADII, Transaction } from "../theme/constants";
 import { formatTRY } from "../utils/format";
 
 const monthKey = (d: string) => {
@@ -189,7 +189,7 @@ export default function DashboardScreen() {
 
       {/* Mobil Drawer */}
       {!isDesktop && (
-        <Modal visible={drawerOpen} transparent animationType="slide">
+        <Modal visible={drawerOpen} transparent animationType="fade" onRequestClose={() => setDrawerOpen(false)}>
           <View style={styles.drawerOverlay}>
             <View style={styles.drawerPanel}>
               <Sidebar activeTab={activeTab} onSelect={handleSelect} onProfilePress={() => { setDrawerOpen(false); setIsProfileModalVisible(true); }} />
@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
   statRow: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginBottom: 24 },
   statBox: { flexGrow: 1, flexBasis: 150, minWidth: 150, backgroundColor: COLORS.card, borderRadius: 10, padding: 20, borderTopWidth: 3, position: "relative", minHeight: 120 },
   statBoxTitle: { fontSize: 12, color: COLORS.textMuted, fontWeight: "600", marginBottom: 10 },
-  statBoxValue: { fontSize: 26, fontWeight: "800", marginBottom: 6, fontFamily: "monospace" },
+  statBoxValue: { fontSize: 26, fontWeight: "800", marginBottom: 6, fontFamily: MONO },
   statBoxSub: { fontSize: 11, color: COLORS.textMuted },
   statBoxIcon: { position: "absolute", right: 16, bottom: 16 },
 
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
   txIconBox: { width: 36, height: 36, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.03)", alignItems: "center", justifyContent: "center", marginRight: 12 },
   txTitle: { color: COLORS.text, fontSize: 14, fontWeight: "600" },
   txMeta: { fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
-  txAmount: { fontSize: 14, fontWeight: "700", fontFamily: "monospace" },
+  txAmount: { fontSize: 14, fontWeight: "700", fontFamily: MONO },
 
   barChartContainer: { height: 260, justifyContent: "space-between" },
   barChartDrawArea: { flex: 1, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-around", paddingBottom: 10 },

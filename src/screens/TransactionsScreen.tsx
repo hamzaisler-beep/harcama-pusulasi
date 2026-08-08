@@ -34,7 +34,7 @@ import { tr } from "date-fns/locale";
 import * as DocumentPicker from "expo-document-picker";
 import * as XLSX from "xlsx";
 import { store } from "../store";
-import { COLORS } from "../theme/constants";
+import { COLORS, MONO } from "../theme/constants";
 
 const CATEGORIES = [
     { label: "Maaş", icon: "payments" },
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
   txTitle: { color: "#fff", fontSize: 15, fontWeight: "600" },
   txMeta: { color: COLORS.textMuted, fontSize: 11, marginTop: 2 },
   txAmountBox: { alignItems: "flex-end", marginRight: 12 },
-  txAmount: { fontSize: 15, fontWeight: "800", fontFamily: "Space Mono, monospace" },
+  txAmount: { fontSize: 15, fontWeight: "800", fontFamily: MONO },
   txCategory: { color: COLORS.textMuted, fontSize: 10, marginTop: 2 },
   deleteBtn: { padding: 8, marginLeft: 4 },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center", padding: 20 },
