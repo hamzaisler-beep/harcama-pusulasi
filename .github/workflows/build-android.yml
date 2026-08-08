@@ -46,9 +46,12 @@ jobs:
       - name: Gradle önbelleği
         uses: gradle/actions/setup-gradle@v4
 
+      # Sadece arm64-v8a derlenir: 2016 sonrası neredeyse tüm Android
+      # telefonlar bu mimariyi kullanır. Dört mimariyi birden derlemek
+      # (varsayılan) derleme süresini kat kat uzatıyor ve APK'yı şişiriyor.
       - name: APK derle (release)
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
 
       - name: APK'yı yeniden adlandır
         run: |
