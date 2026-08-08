@@ -1,0 +1,66 @@
+name: Android APK Derle
+
+# Telefona kurulabilir bir APK üretir.
+# Expo hesabı, EAS aboneliği veya herhangi bir gizli anahtar gerekmez:
+# GitHub runner'ında Android SDK hazır gelir ve release derlemesi
+# React Native'in varsayılan debug keystore'u ile imzalanır.
+on:
+  push:
+    paths-ignore:
+      - "README.md"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: APK derle
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu çek
+        uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Java (JDK 17) kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Android SDK hazırla
+        uses: android-actions/setup-android@v3
+
+      - name: Bağımlılıkları yükle
+        run: npm ci
+
+      - name: Tip kontrolü
+        run: npx tsc --noEmit
+
+      - name: Native projeyi üret (prebuild)
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Gradle önbelleği
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: APK derle (release)
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: APK'yı yeniden adlandır
+        run: |
+          mkdir -p artifacts
+          cp android/app/build/outputs/apk/release/app-release.apk \
+             artifacts/HarcamaPusulasi.apk
+          ls -lh artifacts/
+
+      - name: APK'yı yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: HarcamaPusulasi-apk
+          path: artifacts/HarcamaPusulasi.apk
+          retention-days: 30
+          if-no-files-found: error
