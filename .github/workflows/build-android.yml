@@ -10,6 +10,9 @@ on:
       - "README.md"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: APK derle
@@ -67,3 +70,18 @@ jobs:
           path: artifacts/HarcamaPusulasi.apk
           retention-days: 30
           if-no-files-found: error
+
+      # APK'yı sabit "apk-latest" sürümüne koyar. Böylece telefondan
+      # giriş yapmadan, zip açmadan tıklanabilen kalıcı bir link oluşur:
+      # .../releases/download/apk-latest/HarcamaPusulasi.apk
+      - name: Doğrudan indirme linki (Release) güncelle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view apk-latest >/dev/null 2>&1; then
+            gh release upload apk-latest artifacts/HarcamaPusulasi.apk --clobber
+          else
+            gh release create apk-latest artifacts/HarcamaPusulasi.apk \
+              --title "Harcama Pusulası — Son APK" \
+              --notes "Android telefona doğrudan kurulabilir APK (arm64-v8a). Her derlemede güncellenir."
+          fi
