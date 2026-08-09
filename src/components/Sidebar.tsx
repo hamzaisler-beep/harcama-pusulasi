@@ -57,8 +57,8 @@ export default function Sidebar({ activeTab, onSelect, onProfilePress }: Props) 
           <Text style={styles.logoIconText}>FF</Text>
         </View>
         <View style={styles.logoTextRow}>
-          <Text style={styles.logoFin}>Fin</Text>
-          <Text style={styles.logoFlow}> Flow</Text>
+          <Text style={styles.logoFin}>Harcama</Text>
+          <Text style={styles.logoFlow}> Pusulası</Text>
         </View>
       </View>
 
@@ -89,15 +89,6 @@ export default function Sidebar({ activeTab, onSelect, onProfilePress }: Props) 
           </View>
         ))}
       </ScrollView>
-
-      {/* Pro Badge */}
-      <TouchableOpacity style={styles.proBadge} activeOpacity={0.8}>
-        <Text style={styles.proStar}>⭐</Text>
-        <View>
-          <Text style={styles.proLabel}>PRO</Text>
-          <Text style={styles.proSub}>Sınırsız kullanım</Text>
-        </View>
-      </TouchableOpacity>
 
       {/* User Area */}
       <TouchableOpacity style={styles.userCard} onPress={onProfilePress} activeOpacity={0.7}>
@@ -145,8 +136,8 @@ const styles = StyleSheet.create({
   },
   logoIconText: { color: "#000", fontWeight: "900", fontSize: 11 },
   logoTextRow: { flexDirection: "row", alignItems: "center" },
-  logoFin: { color: "#fff", fontWeight: "800", fontSize: 18 },
-  logoFlow: { color: COLORS.primary, fontWeight: "800", fontSize: 18 },
+  logoFin: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  logoFlow: { color: COLORS.primary, fontWeight: "800", fontSize: 15 },
 
   navSection: { marginBottom: 24, paddingHorizontal: 12 },
   navSectionTitle: {
@@ -171,22 +162,6 @@ const styles = StyleSheet.create({
   },
   navItemLabel: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "600" },
   activeNavLabel: { color: COLORS.primary },
-
-  proBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginHorizontal: 12,
-    marginBottom: 8,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: "rgba(0,201,167,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(0,201,167,0.2)",
-  },
-  proStar: { fontSize: 18 },
-  proLabel: { color: COLORS.primary, fontWeight: "800", fontSize: 12 },
-  proSub: { color: COLORS.textMuted, fontSize: 10 },
 
   userCard: {
     flexDirection: "row",

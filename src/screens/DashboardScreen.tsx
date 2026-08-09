@@ -165,14 +165,6 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={s.safe}>
-      {/* Demo Banner */}
-      <View style={s.demoBanner}>
-        <Text style={s.demoText}>🚀 Demo modundasınız — değişiklikler kaydedilmez.</Text>
-        <TouchableOpacity style={s.registerBtn}>
-          <Text style={s.registerBtnText}>Ücretsiz Kayıt Ol</Text>
-        </TouchableOpacity>
-      </View>
-
       <View style={s.body}>
         {isDesktop && (
           <Sidebar activeTab={activeTab} onSelect={handleSelect} onProfilePress={openProfile} />
@@ -481,15 +473,6 @@ const AccountRow = ({ acc }: { acc: any }) => (
 // ─── Styles ─────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
-  demoBanner: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    paddingVertical: 8, paddingHorizontal: 16, gap: 12,
-    backgroundColor: "#6C63FF",
-  },
-  demoText: { color: "rgba(255,255,255,0.85)", fontSize: 12 },
-  registerBtn: { backgroundColor: "#fff", borderRadius: 6, paddingHorizontal: 12, paddingVertical: 4 },
-  registerBtnText: { color: "#000", fontWeight: "700", fontSize: 12 },
-
   body: { flex: 1, flexDirection: "row" },
   main: { flex: 1 },
 
