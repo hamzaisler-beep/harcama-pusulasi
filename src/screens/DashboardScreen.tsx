@@ -1,25 +1,15 @@
 // src/screens/DashboardScreen.tsx
 import React, { useState, useEffect, useMemo } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
   TouchableOpacity,
-  Dimensions,
-  Platform,
   Modal,
   TouchableWithoutFeedback,
-  TextInput,
-  ActivityIndicator,
-  useWindowDimensions
+  useWindowDimensions,
 } from "react-native";
-import {
-  updateProfile,
-  updatePassword,
-  reauthenticateWithCredential,
-  EmailAuthProvider,
-} from "firebase/auth";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import Svg, { Circle, Rect } from "react-native-svg";
@@ -49,6 +39,7 @@ import DebtsScreen from "./DebtsScreen";
 import CurrencyScreen from "./CurrencyScreen";
 import TaxScreen from "./TaxScreen";
 import ReportsScreen from "./ReportsScreen";
+import SettingsScreen from "./SettingsScreen";
 
 import Sidebar from "../components/Sidebar";
 
@@ -58,81 +49,7 @@ export default function DashboardScreen() {
 
   const [tick, setTick] = useState(0);
   const [activeTab, setActiveTab] = useState("Dashboard");
-  const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-
-  // Profil paneli: "menu" | "name" | "password"
-  const [profileView, setProfileView] = useState<"menu" | "name" | "password">("menu");
-  const [nameInput, setNameInput] = useState("");
-  const [currentPw, setCurrentPw] = useState("");
-  const [newPw, setNewPw] = useState("");
-  const [newPw2, setNewPw2] = useState("");
-  const [profileBusy, setProfileBusy] = useState(false);
-  const [profileError, setProfileError] = useState("");
-  const [profileOk, setProfileOk] = useState("");
-
-  const openProfile = () => {
-    setProfileView("menu");
-    setProfileError("");
-    setProfileOk("");
-    setIsProfileModalVisible(true);
-  };
-
-  const goProfileView = (v: "menu" | "name" | "password") => {
-    setProfileError("");
-    setProfileOk("");
-    if (v === "name") setNameInput(auth.currentUser?.displayName || "");
-    if (v === "password") {
-      setCurrentPw("");
-      setNewPw("");
-      setNewPw2("");
-    }
-    setProfileView(v);
-  };
-
-  const handleSaveName = async () => {
-    const user = auth.currentUser;
-    if (!user || !nameInput.trim()) return;
-    setProfileBusy(true);
-    setProfileError("");
-    try {
-      await updateProfile(user, { displayName: nameInput.trim() });
-      setProfileOk("Adınız güncellendi.");
-      setTick((t) => t + 1); // kenar menüdeki ad/baş harfleri tazele
-      setProfileView("menu");
-    } catch (e: any) {
-      setProfileError(authErrorText(e?.code));
-    } finally {
-      setProfileBusy(false);
-    }
-  };
-
-  const handleChangePassword = async () => {
-    const user = auth.currentUser;
-    if (!user?.email) return;
-    if (newPw.length < 6) {
-      setProfileError("Yeni şifre en az 6 karakter olmalı.");
-      return;
-    }
-    if (newPw !== newPw2) {
-      setProfileError("Yeni şifreler birbiriyle eşleşmiyor.");
-      return;
-    }
-    setProfileBusy(true);
-    setProfileError("");
-    try {
-      // Firebase şifre değişimi için yakın zamanda giriş yapılmış olmasını ister.
-      const cred = EmailAuthProvider.credential(user.email, currentPw);
-      await reauthenticateWithCredential(user, cred);
-      await updatePassword(user, newPw);
-      setProfileOk("Şifreniz değiştirildi.");
-      setProfileView("menu");
-    } catch (e: any) {
-      setProfileError(authErrorText(e?.code));
-    } finally {
-      setProfileBusy(false);
-    }
-  };
 
   useEffect(() => {
     const fn = () => setTick(t => t + 1);
@@ -240,6 +157,7 @@ export default function DashboardScreen() {
         case "Döviz & Kur": return <CurrencyScreen />;
         case "Vergi": return <TaxScreen />;
         case "Raporlar": return <ReportsScreen />;
+        case "Ayarlar": return <SettingsScreen onUpdate={() => setTick(t => t + 1)} />;
         default: return <DashboardMain data={data} transactions={store.transactions} isDesktop={isDesktop} />;
     }
   };
@@ -248,7 +166,7 @@ export default function DashboardScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
         {isDesktop && (
-          <Sidebar activeTab={activeTab} onSelect={handleSelect} onProfilePress={openProfile} />
+          <Sidebar activeTab={activeTab} onSelect={handleSelect} onProfilePress={() => handleSelect("Ayarlar")} />
         )}
         <View style={styles.mainContentContainer}>
           {!isDesktop && (
@@ -257,7 +175,7 @@ export default function DashboardScreen() {
                 <MaterialIcons name="menu" size={24} color={COLORS.text} />
               </TouchableOpacity>
               <Text style={styles.mobileTitle} numberOfLines={1}>{activeTab}</Text>
-              <TouchableOpacity onPress={openProfile} style={styles.mobileAvatar}>
+              <TouchableOpacity onPress={() => handleSelect("Ayarlar")} style={styles.mobileAvatar}>
                 <Text style={{ color: "#000", fontWeight: "700", fontSize: 12 }}>
                   {(auth.currentUser?.displayName || auth.currentUser?.email || "K").substring(0, 2).toUpperCase()}
                 </Text>
@@ -273,7 +191,7 @@ export default function DashboardScreen() {
         <Modal visible={drawerOpen} transparent animationType="fade" onRequestClose={() => setDrawerOpen(false)}>
           <View style={styles.drawerOverlay}>
             <View style={styles.drawerPanel}>
-              <Sidebar activeTab={activeTab} onSelect={handleSelect} onProfilePress={() => { setDrawerOpen(false); openProfile(); }} />
+              <Sidebar activeTab={activeTab} onSelect={handleSelect} onProfilePress={() => { setDrawerOpen(false); handleSelect("Ayarlar"); }} />
             </View>
             <TouchableWithoutFeedback onPress={() => setDrawerOpen(false)}>
               <View style={styles.drawerBackdrop} />
@@ -282,113 +200,9 @@ export default function DashboardScreen() {
         </Modal>
       )}
 
-      {/* Profile Settings Modal */}
-      <Modal visible={isProfileModalVisible} transparent animationType="fade">
-          <View style={styles.profileModalOverlay}>
-              <TouchableWithoutFeedback onPress={() => setIsProfileModalVisible(false)}>
-                  <View style={StyleSheet.absoluteFill} />
-              </TouchableWithoutFeedback>
-              <View style={styles.profileModalContent}>
-                  <View style={styles.profileModalHeader}>
-                      <View style={styles.largeAvatar}>
-                          <Text style={styles.largeAvatarText}>
-                              {(auth.currentUser?.displayName || auth.currentUser?.email || "K").substring(0, 2).toUpperCase()}
-                          </Text>
-                      </View>
-                      <Text style={styles.modalUserName}>{auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0]}</Text>
-                      <Text style={styles.modalUserEmail}>{auth.currentUser?.email}</Text>
-                  </View>
-
-                  {!!profileOk && <Text style={styles.profileOk}>{profileOk}</Text>}
-                  {!!profileError && <Text style={styles.profileErr}>{profileError}</Text>}
-
-                  {profileView === "menu" && (
-                    <>
-                      <View style={styles.modalMenu}>
-                          <ProfileMenuItem icon="person-outline" label="Profil Bilgileri" onPress={() => goProfileView("name")} />
-                          <ProfileMenuItem icon="lock-outline" label="Şifre Değiştir" onPress={() => goProfileView("password")} />
-                      </View>
-
-                      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-                          <MaterialIcons name="logout" size={20} color={COLORS.expense} />
-                          <Text style={styles.logoutText}>Çıkış Yap</Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-
-                  {profileView === "name" && (
-                    <View>
-                      <Text style={styles.profileFieldLabel}>Görünen ad</Text>
-                      <TextInput
-                        style={styles.profileInput}
-                        value={nameInput}
-                        onChangeText={setNameInput}
-                        placeholder="Adınız"
-                        placeholderTextColor={COLORS.textMuted}
-                        autoFocus
-                      />
-                      <View style={styles.profileBtnRow}>
-                        <TouchableOpacity style={styles.profileCancelBtn} onPress={() => goProfileView("menu")}>
-                          <Text style={styles.profileCancelText}>Vazgeç</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.profileSaveBtn} onPress={handleSaveName} disabled={profileBusy}>
-                          {profileBusy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.profileSaveText}>Kaydet</Text>}
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-
-                  {profileView === "password" && (
-                    <View>
-                      <Text style={styles.profileFieldLabel}>Mevcut şifre</Text>
-                      <TextInput style={styles.profileInput} value={currentPw} onChangeText={setCurrentPw} secureTextEntry placeholder="••••••" placeholderTextColor={COLORS.textMuted} />
-                      <Text style={styles.profileFieldLabel}>Yeni şifre</Text>
-                      <TextInput style={styles.profileInput} value={newPw} onChangeText={setNewPw} secureTextEntry placeholder="En az 6 karakter" placeholderTextColor={COLORS.textMuted} />
-                      <Text style={styles.profileFieldLabel}>Yeni şifre (tekrar)</Text>
-                      <TextInput style={styles.profileInput} value={newPw2} onChangeText={setNewPw2} secureTextEntry placeholder="••••••" placeholderTextColor={COLORS.textMuted} />
-                      <View style={styles.profileBtnRow}>
-                        <TouchableOpacity style={styles.profileCancelBtn} onPress={() => goProfileView("menu")}>
-                          <Text style={styles.profileCancelText}>Vazgeç</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.profileSaveBtn} onPress={handleChangePassword} disabled={profileBusy}>
-                          {profileBusy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.profileSaveText}>Değiştir</Text>}
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-              </View>
-          </View>
-      </Modal>
     </SafeAreaView>
   );
 }
-
-// Firebase hata kodlarını okunur Türkçeye çevirir.
-const authErrorText = (code?: string) => {
-    switch (code) {
-        case "auth/wrong-password":
-        case "auth/invalid-credential":
-            return "Mevcut şifre hatalı.";
-        case "auth/weak-password":
-            return "Yeni şifre çok zayıf (en az 6 karakter).";
-        case "auth/requires-recent-login":
-            return "Güvenlik için çıkış yapıp tekrar giriş yapın.";
-        case "auth/too-many-requests":
-            return "Çok fazla deneme yapıldı, biraz sonra tekrar deneyin.";
-        case "auth/network-request-failed":
-            return "İnternet bağlantısı kurulamadı.";
-        default:
-            return "İşlem tamamlanamadı, lütfen tekrar deneyin.";
-    }
-};
-
-const ProfileMenuItem = ({ icon, label, onPress }: any) => (
-    <TouchableOpacity style={styles.profileMenuItem} onPress={onPress}>
-        <MaterialIcons name={icon} size={22} color={COLORS.textSecondary} />
-        <Text style={styles.profileMenuLabel}>{label}</Text>
-        <MaterialIcons name="chevron-right" size={20} color={COLORS.textMuted} />
-    </TouchableOpacity>
-);
 
 const DashboardMain = ({ data, transactions, isDesktop }: { data: any, transactions: Transaction[], isDesktop: boolean }) => {
     const deltaText = (d: number) => (d === 0 ? "Değişim yok" : `${d > 0 ? "+" : ""}${d}% geçen ay`);
@@ -531,11 +345,11 @@ const CustomDoughnut = ({ data, total }: any) => {
 
 const StatBox = ({ title, value, color, sub, icon }: any) => (
     <View style={[styles.statBox, { borderTopColor: color }]}>
-        <Text style={styles.statBoxTitle}>{title}</Text>
-        <Text style={[styles.statBoxValue, { color: title === "Bu Ay Gider" ? COLORS.expense : color }]}>
+        <Text style={styles.statBoxTitle} numberOfLines={1}>{title}</Text>
+        <Text style={[styles.statBoxValue, { color: title === "Bu Ay Gider" ? COLORS.expense : color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
             ₺{new Intl.NumberFormat("tr-TR").format(value)}
         </Text>
-        <Text style={styles.statBoxSub}>{sub}</Text>
+        <Text style={styles.statBoxSub} numberOfLines={1}>{sub}</Text>
         <View style={styles.statBoxIcon}>
             <MaterialIcons name={icon} size={32} color={color} style={{ opacity: 0.15 }} />
         </View>
@@ -595,7 +409,7 @@ const styles = StyleSheet.create({
   statRow: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginBottom: 24 },
   statBox: { flexGrow: 1, flexBasis: 150, minWidth: 150, backgroundColor: COLORS.card, borderRadius: 10, padding: 20, borderTopWidth: 3, position: "relative", minHeight: 120 },
   statBoxTitle: { fontSize: 12, color: COLORS.textMuted, fontWeight: "600", marginBottom: 10 },
-  statBoxValue: { fontSize: 26, fontWeight: "800", marginBottom: 6, fontFamily: MONO },
+  statBoxValue: { fontSize: 22, fontWeight: "800", marginBottom: 6, fontFamily: MONO },
   statBoxSub: { fontSize: 11, color: COLORS.textMuted },
   statBoxIcon: { position: "absolute", right: 16, bottom: 16 },
 
@@ -633,41 +447,4 @@ const styles = StyleSheet.create({
   budgetRow: { marginBottom: 20 },
   emptyHint: { color: COLORS.textMuted, fontSize: 13, textAlign: "center", paddingVertical: 24, lineHeight: 19 },
 
-  // Profile Modal Styles
-  profileModalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.3)" },
-  profileModalContent: { 
-    position: 'absolute', 
-    top: 70, 
-    left: 12, 
-    width: 280, 
-    backgroundColor: "#1c1f2b", 
-    borderRadius: 16, 
-    padding: 20, 
-    borderWidth: 1, 
-    borderColor: COLORS.border, 
-    ...Platform.select({
-        web: { boxShadow: "0px 10px 24px rgba(0,0,0,0.5)" },
-        ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20 },
-        android: { elevation: 10 }
-    })
-  },
-  profileModalHeader: { alignItems: "flex-start", marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
-  largeAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#78dcc8", alignItems: "center", justifyContent: "center", marginBottom: 12 },
-  largeAvatarText: { fontSize: 16, fontWeight: "800", color: "#000" },
-  modalUserName: { fontSize: 15, fontWeight: "700", color: "#fff", marginBottom: 2 },
-  modalUserEmail: { fontSize: 11, color: COLORS.textMuted },
-  modalMenu: { marginBottom: 20 },
-  profileMenuItem: { flexDirection: "row", alignItems: "center", paddingVertical: 12 },
-  profileMenuLabel: { flex: 1, marginLeft: 12, color: COLORS.text, fontSize: 13, fontWeight: "600" },
-  profileOk: { color: COLORS.income, fontSize: 12, marginBottom: 12 },
-  profileErr: { color: COLORS.expense, fontSize: 12, marginBottom: 12 },
-  profileFieldLabel: { color: COLORS.textMuted, fontSize: 11, fontWeight: "700", marginBottom: 6 },
-  profileInput: { backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: "#fff", fontSize: 14, borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
-  profileBtnRow: { flexDirection: "row", gap: 10, marginTop: 4 },
-  profileCancelBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 10, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: COLORS.border },
-  profileCancelText: { color: COLORS.textSecondary, fontWeight: "700", fontSize: 13 },
-  profileSaveBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 10, backgroundColor: COLORS.primary },
-  profileSaveText: { color: "#fff", fontWeight: "800", fontSize: 13 },
-  logoutBtn: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderTopWidth: 1, borderColor: "rgba(255,255,255,0.05)", marginTop: 4 },
-  logoutText: { color: COLORS.expense, fontSize: 13, fontWeight: "700" },
 });

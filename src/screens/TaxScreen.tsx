@@ -1,6 +1,6 @@
 // src/screens/TaxScreen.tsx
 import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform, useWindowDimensions } from "react-native";
 import { COLORS, MONO } from "../theme/constants";
 import { formatTRY } from "../utils/format";
 
@@ -28,6 +28,9 @@ function progressiveTax(base: number) {
 const KDV_RATES = [1, 10, 20];
 
 export default function TaxScreen() {
+  const { width } = useWindowDimensions();
+  const mob = width < 600;
+
   // KDV
   const [kdvAmount, setKdvAmount] = useState("1000");
   const [kdvRate, setKdvRate] = useState(20);
@@ -53,17 +56,17 @@ export default function TaxScreen() {
   }, [income]);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollInside} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: mob ? 16 : 32 }} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Vergi Hesaplayıcı</Text>
+          <Text style={[styles.title, mob && { fontSize: 22 }]}>Vergi Hesaplayıcı</Text>
           <Text style={styles.subtitle}>KDV ve gelir vergisi hesaplamaları</Text>
         </View>
       </View>
 
-      <View style={styles.grid}>
+      <View style={[styles.grid, mob && { flexDirection: "column" }]}>
         {/* KDV */}
-        <View style={styles.card}>
+        <View style={[styles.card, mob && { minWidth: 0 }]}>
           <Text style={styles.cardTitle}>KDV HESAPLAMA</Text>
 
           <Text style={styles.fieldLabel}>Tutar</Text>
@@ -95,7 +98,7 @@ export default function TaxScreen() {
         </View>
 
         {/* Gelir Vergisi */}
-        <View style={styles.card}>
+        <View style={[styles.card, mob && { minWidth: 0 }]}>
           <Text style={styles.cardTitle}>GELİR VERGİSİ (2025)</Text>
 
           <Text style={styles.fieldLabel}>Yıllık Vergi Matrahı</Text>

@@ -42,4 +42,8 @@ if (Platform.OS === "web") {
 
 export const auth = authInstance;
 export const db = getFirestore(app);
+export const storage = (() => {
+  const { getStorage } = require("firebase/storage");
+  return getStorage(app);
+})();
 export default app;

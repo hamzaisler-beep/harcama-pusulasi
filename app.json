@@ -16,6 +16,15 @@
       "resizeMode": "contain",
       "backgroundColor": "#0F1117"
     },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Profil fotoğrafınızı güncellemek için fotoğraf erişimi gerekiyor.",
+          "cameraPermission": "Profil fotoğrafı çekmek için kamera erişimi gerekiyor."
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.harcamapusulasi.app"

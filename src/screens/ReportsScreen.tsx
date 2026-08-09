@@ -1,6 +1,6 @@
 // src/screens/ReportsScreen.tsx
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Platform, useWindowDimensions } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { format, subMonths, startOfMonth, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -19,6 +19,9 @@ const safeDate = (d: string) => {
 };
 
 export default function ReportsScreen() {
+  const { width } = useWindowDimensions();
+  const mob = width < 600;
+
   const s = useStore();
   const transactions = s.transactions;
 
@@ -75,23 +78,23 @@ export default function ReportsScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollInside} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: mob ? 16 : 32 }} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <Text style={styles.title}>Raporlar</Text>
+        <Text style={[styles.title, mob && { fontSize: 22 }]}>Raporlar</Text>
         <Text style={styles.subtitle}>Tüm işlemlerinize dayalı analiz</Text>
       </View>
 
       {/* Stat cards */}
       <View style={styles.statRow}>
-        <StatCard title="Toplam Gelir" value={formatTRY(overall.income)} color={COLORS.income} icon="south-west" />
-        <StatCard title="Toplam Gider" value={formatTRY(overall.expense)} color={COLORS.expense} icon="north-east" />
-        <StatCard title="Net" value={formatTRY(overall.net)} color={overall.net >= 0 ? COLORS.income : COLORS.expense} icon="account-balance-wallet" />
-        <StatCard title="Tasarruf Oranı" value={`%${overall.savingsRate.toFixed(0)}`} color={COLORS.primary} icon="savings" />
+        <StatCard title="Toplam Gelir" value={formatTRY(overall.income)} color={COLORS.income} icon="south-west" mob={mob} />
+        <StatCard title="Toplam Gider" value={formatTRY(overall.expense)} color={COLORS.expense} icon="north-east" mob={mob} />
+        <StatCard title="Net" value={formatTRY(overall.net)} color={overall.net >= 0 ? COLORS.income : COLORS.expense} icon="account-balance-wallet" mob={mob} />
+        <StatCard title="Tasarruf Oranı" value={`%${overall.savingsRate.toFixed(0)}`} color={COLORS.primary} icon="savings" mob={mob} />
       </View>
 
-      <View style={styles.grid}>
+      <View style={[styles.grid, mob && { flexDirection: "column" }]}>
         {/* Monthly trend */}
-        <View style={[styles.panel, { flex: 1.3 }]}>
+        <View style={[styles.panel, { flex: 1.3 }, mob && { minWidth: 0 }]}>
           <Text style={styles.panelTitle}>SON 6 AY · GELİR / GİDER</Text>
           <View style={styles.chart}>
             {monthly.map((m) => (
@@ -111,7 +114,7 @@ export default function ReportsScreen() {
         </View>
 
         {/* Category breakdown */}
-        <View style={[styles.panel, { flex: 1 }]}>
+        <View style={[styles.panel, { flex: 1 }, mob && { minWidth: 0 }]}>
           <Text style={styles.panelTitle}>GİDER KATEGORİLERİ</Text>
           {categories.arr.length === 0 ? (
             <Text style={styles.smallEmpty}>Gider kaydı yok.</Text>
@@ -144,13 +147,13 @@ export default function ReportsScreen() {
   );
 }
 
-const StatCard = ({ title, value, color, icon }: any) => (
-  <View style={[styles.statCard, { borderTopColor: color }]}>
+const StatCard = ({ title, value, color, icon, mob }: any) => (
+  <View style={[styles.statCard, { borderTopColor: color }, mob && { minWidth: 0 }]}>
     <View style={styles.statHeader}>
       <Text style={styles.statTitle}>{title}</Text>
       <MaterialIcons name={icon} size={18} color={color} />
     </View>
-    <Text style={[styles.statValue, { color }]}>{value}</Text>
+    <Text style={[styles.statValue, { color }, mob && { fontSize: 16 }]}>{value}</Text>
   </View>
 );
 

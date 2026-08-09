@@ -12,6 +12,7 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
   Alert,
+  useWindowDimensions,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { store } from "../store";
@@ -24,7 +25,7 @@ type AccType = "CASH" | "BANK" | "CARD";
 const ACCOUNT_TYPES: { key: AccType; label: string; icon: any }[] = [
   { key: "CASH", label: "Nakit", icon: "payments" },
   { key: "BANK", label: "Banka", icon: "account-balance" },
-  { key: "CARD", label: "Kredi Kartı", icon: "credit-card" },
+  { key: "CARD", label: "Kart", icon: "credit-card" },
 ];
 
 const COLOR_CHOICES = [
@@ -48,6 +49,9 @@ const confirmDelete = (msg: string, onYes: () => void) => {
 };
 
 export default function AccountsScreen() {
+  const { width } = useWindowDimensions();
+  const mob = width < 600;
+
   const s = useStore();
   const accounts = s.accounts;
 
@@ -86,41 +90,34 @@ export default function AccountsScreen() {
     if (!name.trim()) return;
     setSaving(true);
     try {
-      const payload = {
-        name: name.trim(),
-        type,
-        balance: Number(balance) || 0,
-        color,
-      };
-      if (editing) {
-        await store.updateAccount(editing.id, payload);
-      } else {
-        await store.addAccount(payload);
-      }
+      const payload = { name: name.trim(), type, balance: Number(balance) || 0, color };
+      if (editing) await store.updateAccount(editing.id, payload);
+      else await store.addAccount(payload);
       setModalOpen(false);
     } finally {
       setSaving(false);
     }
   };
 
-  const typeMeta = (t: AccType) =>
-    ACCOUNT_TYPES.find((x) => x.key === t) || ACCOUNT_TYPES[0];
+  const typeMeta = (t: AccType) => ACCOUNT_TYPES.find((x) => x.key === t) || ACCOUNT_TYPES[0];
+
+  const pad = mob ? 16 : 32;
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.scrollInside}
+      contentContainerStyle={{ padding: pad }}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Hesaplar</Text>
-          <Text style={styles.subtitle}>Nakit, banka ve kart bakiyeleriniz</Text>
+        <View style={{ flex: 1, marginRight: 12 }}>
+          <Text style={[styles.title, mob && { fontSize: 22 }]}>Hesaplar</Text>
+          {!mob && <Text style={styles.subtitle}>Nakit, banka ve kart bakiyeleriniz</Text>}
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={openAdd}>
-          <MaterialIcons name="add" size={20} color="#fff" />
-          <Text style={styles.addBtnText}>Hesap Ekle</Text>
+          <MaterialIcons name="add" size={18} color="#fff" />
+          <Text style={styles.addBtnText}>{mob ? "Ekle" : "Hesap Ekle"}</Text>
         </TouchableOpacity>
       </View>
 
@@ -144,11 +141,18 @@ export default function AccountsScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.cardsGrid}>
+        <View style={[styles.cardsGrid, mob && { flexDirection: "column" }]}>
           {accounts.map((a) => {
             const meta = typeMeta(a.type);
             return (
-              <View key={a.id} style={[styles.accCard, { borderTopColor: a.color || COLORS.primary }]}>
+              <View
+                key={a.id}
+                style={[
+                  styles.accCard,
+                  { borderTopColor: a.color || COLORS.primary },
+                  mob && { width: "100%" },
+                ]}
+              >
                 <View style={styles.accCardTop}>
                   <View style={[styles.accIcon, { backgroundColor: (a.color || COLORS.primary) + "22" }]}>
                     <MaterialIcons name={meta.icon} size={22} color={a.color || COLORS.primary} />
@@ -244,42 +248,41 @@ export default function AccountsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollInside: { padding: 32 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   title: { fontSize: 28, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
   subtitle: { fontSize: 13, color: COLORS.textMuted, marginTop: 4 },
-  addBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: COLORS.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
+  addBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: COLORS.primary, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
   addBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
 
-  netCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.border, marginBottom: 24 },
+  netCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: COLORS.border, marginBottom: 20 },
   netLabel: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1.2 },
-  netValue: { fontSize: 34, fontWeight: "900", marginTop: 8, fontFamily: MONO },
+  netValue: { fontSize: 30, fontWeight: "900", marginTop: 6, fontFamily: MONO },
   netSub: { fontSize: 12, color: COLORS.textMuted, marginTop: 4 },
 
   cardsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
-  accCard: { width: 240, backgroundColor: COLORS.card, borderRadius: 14, padding: 20, borderWidth: 1, borderColor: COLORS.border, borderTopWidth: 3 },
-  accCardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  accIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  accCard: { width: 240, backgroundColor: COLORS.card, borderRadius: 14, padding: 18, borderWidth: 1, borderColor: COLORS.border, borderTopWidth: 3 },
+  accCardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
+  accIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   accActions: { flexDirection: "row", gap: 4 },
   iconMini: { padding: 6 },
-  accName: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  accName: { color: "#fff", fontSize: 15, fontWeight: "700" },
   accType: { color: COLORS.textMuted, fontSize: 12, marginTop: 2 },
-  accBalance: { fontSize: 22, fontWeight: "800", marginTop: 16, fontFamily: MONO },
+  accBalance: { fontSize: 20, fontWeight: "800", marginTop: 14, fontFamily: MONO },
 
   emptyState: { alignItems: "center", justifyContent: "center", paddingVertical: 60 },
   emptyText: { color: COLORS.textMuted, fontSize: 14, marginTop: 16 },
 
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center", padding: 20 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center", padding: 16 },
   modalContent: { width: "100%", maxWidth: 460, backgroundColor: COLORS.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: COLORS.border },
   modalTitle: { fontSize: 20, fontWeight: "800", color: "#fff", marginBottom: 20 },
-  input: { backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 14, color: "#fff", fontSize: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 4 },
+  input: { backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 14, color: "#fff", fontSize: 15, borderWidth: 1, borderColor: COLORS.border, marginBottom: 4 },
   fieldLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: "700", marginTop: 16, marginBottom: 8 },
   typeRow: { flexDirection: "row", gap: 8 },
-  typeChip: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: COLORS.border },
+  typeChip: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 10, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: COLORS.border },
   typeChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  typeChipText: { color: COLORS.textMuted, fontWeight: "700", fontSize: 12 },
+  typeChipText: { color: COLORS.textMuted, fontWeight: "700", fontSize: 11 },
   colorRow: { flexDirection: "row", gap: 12 },
-  colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "transparent" },
+  colorDot: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: "transparent" },
   colorDotActive: { borderColor: "#fff" },
   saveBtn: { backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 24 },
   saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "800" },

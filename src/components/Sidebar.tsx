@@ -32,6 +32,10 @@ export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
     title: "ANALİZ",
     items: [{ icon: "bar-chart", label: "Raporlar", target: "Raporlar" }],
   },
+  {
+    title: "HESAP",
+    items: [{ icon: "settings", label: "Ayarlar", target: "Ayarlar" }],
+  },
 ];
 
 type Props = {
