@@ -9,6 +9,8 @@ import {
   doc,
   setDoc,
   deleteDoc,
+  getDocs,
+  writeBatch,
   Timestamp,
 } from "firebase/firestore";
 import { db, auth } from "../services/firebase";
@@ -196,6 +198,32 @@ class GlobalStore {
   }
   deleteDebt(id: string) {
     return this.remove("debts", id);
+  }
+
+  // --- Tüm kullanıcı verisini sil ---
+  async deleteAllUserData() {
+    if (!this.familyId) return;
+    const colls = ["transactions", "accounts", "savings", "investments", "budgets", "goals", "debts"];
+    const CHUNK = 490;
+    let pending: ReturnType<typeof doc>[] = [];
+
+    const flush = async () => {
+      if (pending.length === 0) return;
+      const batch = writeBatch(db);
+      pending.forEach((ref) => batch.delete(ref));
+      await batch.commit();
+      pending = [];
+    };
+
+    for (const coll of colls) {
+      const q = query(collection(db, coll), where("familyId", "==", this.familyId));
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        pending.push(d.ref as any);
+        if (pending.length >= CHUNK) await flush();
+      }
+    }
+    await flush();
   }
 
   // --- Yatırımlar ---

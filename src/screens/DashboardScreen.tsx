@@ -1,10 +1,10 @@
 // src/screens/DashboardScreen.tsx
 import React, { useState, useEffect, useMemo } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
   TouchableOpacity,
   Dimensions,
   Platform,
@@ -12,6 +12,7 @@ import {
   TouchableWithoutFeedback,
   TextInput,
   ActivityIndicator,
+  Alert,
   useWindowDimensions
 } from "react-native";
 import {
@@ -142,6 +143,39 @@ export default function DashboardScreen() {
 
   const handleLogout = () => {
     auth.signOut();
+  };
+
+  const [deletingData, setDeletingData] = useState(false);
+
+  const handleDeleteAllData = () => {
+    const doDelete = async () => {
+      setDeletingData(true);
+      setProfileError("");
+      try {
+        await store.deleteAllUserData();
+        setProfileOk("Tüm verileriniz silindi.");
+        setProfileView("menu");
+      } catch {
+        setProfileError("Veriler silinirken bir hata oluştu.");
+      } finally {
+        setDeletingData(false);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm("Tüm verileriniz (işlemler, hesaplar, bütçeler, hedefler, yatırımlar, borçlar) kalıcı olarak silinecek. Bu işlem geri alınamaz. Emin misiniz?")) {
+        doDelete();
+      }
+    } else {
+      Alert.alert(
+        "Tüm Verileri Sil",
+        "Tüm verileriniz (işlemler, hesaplar, bütçeler, hedefler, yatırımlar, borçlar) kalıcı olarak silinecek. Bu işlem geri alınamaz.",
+        [
+          { text: "Vazgeç", style: "cancel" },
+          { text: "Evet, Sil", style: "destructive", onPress: doDelete },
+        ]
+      );
+    }
   };
 
   const data = useMemo(() => {
@@ -308,6 +342,14 @@ export default function DashboardScreen() {
                           <ProfileMenuItem icon="person-outline" label="Profil Bilgileri" onPress={() => goProfileView("name")} />
                           <ProfileMenuItem icon="lock-outline" label="Şifre Değiştir" onPress={() => goProfileView("password")} />
                       </View>
+
+                      <TouchableOpacity style={styles.deleteDataBtn} onPress={handleDeleteAllData} disabled={deletingData}>
+                          {deletingData
+                            ? <ActivityIndicator size="small" color={COLORS.expense} />
+                            : <MaterialIcons name="delete-sweep" size={20} color={COLORS.expense} />
+                          }
+                          <Text style={styles.deleteDataText}>Tüm Verilerimi Sil</Text>
+                      </TouchableOpacity>
 
                       <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
                           <MaterialIcons name="logout" size={20} color={COLORS.expense} />
@@ -668,6 +710,8 @@ const styles = StyleSheet.create({
   profileCancelText: { color: COLORS.textSecondary, fontWeight: "700", fontSize: 13 },
   profileSaveBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 10, backgroundColor: COLORS.primary },
   profileSaveText: { color: "#fff", fontWeight: "800", fontSize: 13 },
-  logoutBtn: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderTopWidth: 1, borderColor: "rgba(255,255,255,0.05)", marginTop: 4 },
+  deleteDataBtn: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderTopWidth: 1, borderColor: "rgba(255,255,255,0.05)", marginTop: 4 },
+  deleteDataText: { color: COLORS.expense, fontSize: 13, fontWeight: "700", opacity: 0.7 },
+  logoutBtn: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderTopWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
   logoutText: { color: COLORS.expense, fontSize: 13, fontWeight: "700" },
 });
