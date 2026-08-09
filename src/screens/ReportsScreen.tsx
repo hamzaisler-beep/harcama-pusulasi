@@ -1,195 +1,156 @@
 // src/screens/ReportsScreen.tsx
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView, Platform } from "react-native";
+import React, { useState, useEffect, useMemo } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import Svg, { Polyline, Line, Text as SvgText, Circle } from "react-native-svg";
 import { format, subMonths, startOfMonth, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
-import { useStore } from "../hooks/useStore";
+import { store } from "../store";
 import { COLORS, MONO } from "../theme/constants";
-import { formatTRY, getCategoryIcon } from "../utils/format";
+import { formatTRY } from "../utils/format";
 
-const CAT_COLORS = [COLORS.expense, COLORS.info, COLORS.income, COLORS.warning, COLORS.accent2, COLORS.primary];
-
-const safeDate = (d: string) => {
-  try {
-    return d.includes("T") ? parseISO(d) : new Date(d);
-  } catch {
-    return new Date(0);
-  }
+const monthKey = (d: string) => {
+  try { return format(d.includes("T") ? parseISO(d) : new Date(d), "yyyy-MM"); }
+  catch { return ""; }
 };
 
 export default function ReportsScreen() {
-  const s = useStore();
-  const transactions = s.transactions;
+  const [tick, setTick] = useState(0);
+  const { width } = useWindowDimensions();
+
+  useEffect(() => {
+    const fn = () => setTick(t => t + 1);
+    store.listeners.add(fn);
+    return () => { store.listeners.delete(fn); };
+  }, []);
 
   const monthly = useMemo(() => {
-    const buckets: { key: string; label: string; income: number; expense: number }[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = startOfMonth(subMonths(new Date(), i));
-      buckets.push({ key: format(d, "yyyy-MM"), label: format(d, "MMM", { locale: tr }), income: 0, expense: 0 });
+    const now = new Date();
+    const months = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = startOfMonth(subMonths(now, i));
+      months.push({ key: format(d, "yyyy-MM"), label: format(d, "MMM yy", { locale: tr }), income: 0, expense: 0 });
     }
-    const map = new Map(buckets.map((b) => [b.key, b]));
-    transactions.forEach((t) => {
-      const key = format(safeDate(t.date), "yyyy-MM");
-      const b = map.get(key);
-      if (!b) return;
+    const mmap = new Map(months.map(m => [m.key, m]));
+    store.transactions.forEach(t => {
+      const m = mmap.get(monthKey(t.date));
+      if (!m) return;
       const val = Math.abs(Number(t.amount) || 0);
-      if (t.type === "income") b.income += val;
-      else b.expense += val;
+      if (t.type === "income") m.income += val;
+      else m.expense += val;
     });
-    return buckets;
-  }, [transactions]);
+    return months.map(m => ({ ...m, net: m.income - m.expense }));
+  }, [store.transactions, tick]);
 
-  const categories = useMemo(() => {
-    const totals: Record<string, number> = {};
-    transactions
-      .filter((t) => t.type === "expense")
-      .forEach((t) => {
-        const cat = t.category || "Diğer";
-        totals[cat] = (totals[cat] || 0) + Math.abs(Number(t.amount) || 0);
-      });
-    const arr = Object.entries(totals)
-      .map(([label, value]) => ({ label, value }))
-      .sort((a, b) => b.value - a.value);
-    const sum = arr.reduce((s, x) => s + x.value, 0);
-    return { arr, sum };
-  }, [transactions]);
+  const chartW = Math.min(width - 48, 900);
+  const chartH = 180;
+  const padL = 48, padR = 16, padT = 16, padB = 36;
+  const drawW = chartW - padL - padR;
+  const drawH = chartH - padT - padB;
 
-  const overall = useMemo(() => {
-    const income = transactions.filter((t) => t.type === "income").reduce((s, t) => s + Math.abs(Number(t.amount) || 0), 0);
-    const expense = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + Math.abs(Number(t.amount) || 0), 0);
-    const net = income - expense;
-    const savingsRate = income > 0 ? (net / income) * 100 : 0;
-    return { income, expense, net, savingsRate };
-  }, [transactions]);
+  const maxVal = Math.max(...monthly.map(m => Math.max(m.income, m.expense)), 1);
+  const toX = (i: number) => padL + (i / (monthly.length - 1)) * drawW;
+  const toY = (v: number) => padT + drawH - (v / maxVal) * drawH;
 
-  const maxMonthly = Math.max(...monthly.map((m) => Math.max(m.income, m.expense)), 1);
+  const incPoints = monthly.map((m, i) => `${toX(i)},${toY(m.income)}`).join(" ");
+  const expPoints = monthly.map((m, i) => `${toX(i)},${toY(m.expense)}`).join(" ");
 
-  if (transactions.length === 0) {
-    return (
-      <View style={styles.emptyWrap}>
-        <MaterialIcons name="bar-chart" size={48} color={COLORS.textMuted} style={{ opacity: 0.4 }} />
-        <Text style={styles.emptyText}>Rapor için henüz işlem yok.</Text>
-      </View>
-    );
-  }
+  const yLabels = [0, 0.25, 0.5, 0.75, 1].map(f => ({ val: maxVal * f, y: toY(maxVal * f) }));
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollInside} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Raporlar</Text>
-        <Text style={styles.subtitle}>Tüm işlemlerinize dayalı analiz</Text>
+    <ScrollView style={s.container} contentContainerStyle={[s.scroll, { paddingBottom: 80 }]}>
+      <View style={s.header}>
+        <Text style={s.pageTitle}>Raporlar</Text>
+        <TouchableOpacity style={s.pdfBtn}>
+          <Text style={s.pdfBtnText}>📋 PDF İndir</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Stat cards */}
-      <View style={styles.statRow}>
-        <StatCard title="Toplam Gelir" value={formatTRY(overall.income)} color={COLORS.income} icon="south-west" />
-        <StatCard title="Toplam Gider" value={formatTRY(overall.expense)} color={COLORS.expense} icon="north-east" />
-        <StatCard title="Net" value={formatTRY(overall.net)} color={overall.net >= 0 ? COLORS.income : COLORS.expense} icon="account-balance-wallet" />
-        <StatCard title="Tasarruf Oranı" value={`%${overall.savingsRate.toFixed(0)}`} color={COLORS.primary} icon="savings" />
-      </View>
-
-      <View style={styles.grid}>
-        {/* Monthly trend */}
-        <View style={[styles.panel, { flex: 1.3 }]}>
-          <Text style={styles.panelTitle}>SON 6 AY · GELİR / GİDER</Text>
-          <View style={styles.chart}>
-            {monthly.map((m) => (
-              <View key={m.key} style={styles.barGroup}>
-                <View style={styles.barsWrap}>
-                  <View style={[styles.bar, { height: `${(m.income / maxMonthly) * 100}%`, backgroundColor: COLORS.income }]} />
-                  <View style={[styles.bar, { height: `${(m.expense / maxMonthly) * 100}%`, backgroundColor: COLORS.expense }]} />
-                </View>
-                <Text style={styles.barLabel}>{m.label}</Text>
-              </View>
+      {/* 12 Aylık Trend Chart */}
+      <View style={s.chartCard}>
+        <Text style={s.cardTitle}>12 Aylık Trend</Text>
+        <View style={s.legend}>
+          <View style={s.legendItem}><View style={[s.dot, { backgroundColor: COLORS.income }]} /><Text style={s.legendText}>Gelir</Text></View>
+          <View style={s.legendItem}><View style={[s.dot, { backgroundColor: COLORS.expense }]} /><Text style={s.legendText}>Gider</Text></View>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <Svg width={chartW} height={chartH} style={{ marginTop: 8 }}>
+            {/* Grid lines */}
+            {yLabels.map(({ val, y }, i) => (
+              <React.Fragment key={i}>
+                <Line x1={padL} y1={y} x2={chartW - padR} y2={y} stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4" />
+                <SvgText x={padL - 4} y={y + 4} fill={COLORS.textMuted} fontSize="9" textAnchor="end">
+                  {val >= 1000 ? `₺${(val / 1000).toFixed(0)}k` : `₺${val.toFixed(0)}`}
+                </SvgText>
+              </React.Fragment>
             ))}
-          </View>
-          <View style={styles.legend}>
-            <View style={styles.legendItem}><View style={[styles.dot, { backgroundColor: COLORS.income }]} /><Text style={styles.legendText}>Gelir</Text></View>
-            <View style={styles.legendItem}><View style={[styles.dot, { backgroundColor: COLORS.expense }]} /><Text style={styles.legendText}>Gider</Text></View>
-          </View>
-        </View>
+            {/* Income line */}
+            <Polyline points={incPoints} fill="none" stroke={COLORS.income} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+            {/* Expense line */}
+            <Polyline points={expPoints} fill="none" stroke={COLORS.expense} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+            {/* Data points */}
+            {monthly.map((m, i) => (
+              <React.Fragment key={m.key}>
+                <Circle cx={toX(i)} cy={toY(m.income)} r="3" fill={COLORS.income} />
+                <Circle cx={toX(i)} cy={toY(m.expense)} r="3" fill={COLORS.expense} />
+                {/* X axis labels */}
+                <SvgText x={toX(i)} y={chartH - 4} fill={COLORS.textMuted} fontSize="9" textAnchor="middle">
+                  {m.label}
+                </SvgText>
+              </React.Fragment>
+            ))}
+          </Svg>
+        </ScrollView>
+      </View>
 
-        {/* Category breakdown */}
-        <View style={[styles.panel, { flex: 1 }]}>
-          <Text style={styles.panelTitle}>GİDER KATEGORİLERİ</Text>
-          {categories.arr.length === 0 ? (
-            <Text style={styles.smallEmpty}>Gider kaydı yok.</Text>
-          ) : (
-            categories.arr.slice(0, 7).map((c, i) => {
-              const pct = categories.sum > 0 ? (c.value / categories.sum) * 100 : 0;
-              const color = CAT_COLORS[i % CAT_COLORS.length];
-              return (
-                <View key={c.label} style={styles.catRow}>
-                  <View style={[styles.catIcon, { backgroundColor: color + "22" }]}>
-                    <MaterialIcons name={getCategoryIcon(c.label)} size={16} color={color} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.catTop}>
-                      <Text style={styles.catName}>{c.label}</Text>
-                      <Text style={styles.catValue}>{formatTRY(c.value)}</Text>
-                    </View>
-                    <View style={styles.catTrack}>
-                      <View style={[styles.catFill, { width: `${pct}%`, backgroundColor: color }]} />
-                    </View>
-                  </View>
-                  <Text style={styles.catPct}>%{pct.toFixed(0)}</Text>
-                </View>
-              );
-            })
-          )}
+      {/* Monthly Summary Table */}
+      <View style={s.tableCard}>
+        <Text style={s.cardTitle}>Aylık Özet</Text>
+        {/* Header */}
+        <View style={s.tableHeader}>
+          <Text style={[s.thCell, { flex: 1.5 }]}>Ay</Text>
+          <Text style={[s.thCell, s.thRight]}>Gelir</Text>
+          <Text style={[s.thCell, s.thRight]}>Gider</Text>
+          <Text style={[s.thCell, s.thRight]}>Net</Text>
         </View>
+        {/* Rows (newest first) */}
+        {[...monthly].reverse().map((m) => (
+          <View key={m.key} style={s.tableRow}>
+            <Text style={[s.tdCell, { flex: 1.5 }]}>{m.label}</Text>
+            <Text style={[s.tdCell, s.tdRight, { color: m.income > 0 ? COLORS.income : COLORS.textMuted }]}>
+              {formatTRY(m.income)}
+            </Text>
+            <Text style={[s.tdCell, s.tdRight, { color: m.expense > 0 ? COLORS.expense : COLORS.textMuted }]}>
+              {formatTRY(m.expense)}
+            </Text>
+            <Text style={[s.tdCell, s.tdRight, { color: m.net > 0 ? COLORS.income : m.net < 0 ? COLORS.expense : COLORS.textMuted }]}>
+              {m.net > 0 ? "+" : ""}{formatTRY(m.net)}
+            </Text>
+          </View>
+        ))}
       </View>
     </ScrollView>
   );
 }
 
-const StatCard = ({ title, value, color, icon }: any) => (
-  <View style={[styles.statCard, { borderTopColor: color }]}>
-    <View style={styles.statHeader}>
-      <Text style={styles.statTitle}>{title}</Text>
-      <MaterialIcons name={icon} size={18} color={color} />
-    </View>
-    <Text style={[styles.statValue, { color }]}>{value}</Text>
-  </View>
-);
-
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollInside: { padding: 32 },
-  emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: COLORS.background, padding: 32 },
-  emptyText: { color: COLORS.textMuted, fontSize: 14, marginTop: 16 },
-  header: { marginBottom: 24 },
-  title: { fontSize: 28, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
-  subtitle: { fontSize: 13, color: COLORS.textMuted, marginTop: 4 },
-
-  statRow: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginBottom: 24 },
-  statCard: { flex: 1, minWidth: 180, backgroundColor: COLORS.card, borderRadius: 14, padding: 20, borderWidth: 1, borderColor: COLORS.border, borderTopWidth: 3 },
-  statHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  statTitle: { fontSize: 12, color: COLORS.textMuted, fontWeight: "600" },
-  statValue: { fontSize: 22, fontWeight: "900", fontFamily: MONO },
-
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 24 },
-  panel: { minWidth: 320, backgroundColor: COLORS.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: COLORS.border },
-  panelTitle: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1.2, marginBottom: 24 },
-
-  chart: { height: 220, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-around" },
-  barGroup: { alignItems: "center", flex: 1 },
-  barsWrap: { flexDirection: "row", alignItems: "flex-end", gap: 4, height: "100%" },
-  bar: { width: 12, borderRadius: 3, minHeight: 2 },
-  barLabel: { fontSize: 10, color: COLORS.textMuted, marginTop: 8, fontWeight: "600" },
-  legend: { flexDirection: "row", justifyContent: "center", gap: 20, marginTop: 16 },
+  scroll: { padding: 20 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  pageTitle: { color: "#fff", fontSize: 22, fontWeight: "800" },
+  pdfBtn: { backgroundColor: COLORS.primary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  pdfBtnText: { color: "#000", fontWeight: "700", fontSize: 13 },
+  chartCard: { backgroundColor: COLORS.card, borderRadius: 12, padding: 20, borderWidth: 1, borderColor: COLORS.border, marginBottom: 14 },
+  cardTitle: { color: COLORS.text, fontSize: 16, fontWeight: "800", marginBottom: 8 },
+  legend: { flexDirection: "row", gap: 16, marginBottom: 4 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 11, color: COLORS.textSecondary },
-
-  catRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
-  catIcon: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  catTop: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
-  catName: { color: "#fff", fontSize: 13, fontWeight: "600" },
-  catValue: { color: COLORS.textSecondary, fontSize: 12, fontWeight: "700" },
-  catTrack: { height: 5, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 3, overflow: "hidden" },
-  catFill: { height: "100%", borderRadius: 3 },
-  catPct: { color: COLORS.textMuted, fontSize: 11, width: 38, textAlign: "right" },
-  smallEmpty: { color: COLORS.textMuted, fontSize: 13, paddingVertical: 20, textAlign: "center" },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  legendText: { color: COLORS.textSecondary, fontSize: 12 },
+  tableCard: { backgroundColor: COLORS.card, borderRadius: 12, padding: 20, borderWidth: 1, borderColor: COLORS.border },
+  tableHeader: { flexDirection: "row", paddingBottom: 10, borderBottomWidth: 1, borderColor: COLORS.border, marginBottom: 4 },
+  thCell: { flex: 1, color: COLORS.textMuted, fontSize: 11, fontWeight: "700" },
+  thRight: { textAlign: "right" },
+  tableRow: { flexDirection: "row", paddingVertical: 11, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.03)" },
+  tdCell: { flex: 1, color: COLORS.textSecondary, fontSize: 12, fontFamily: MONO },
+  tdRight: { textAlign: "right" },
 });

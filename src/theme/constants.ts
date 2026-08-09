@@ -10,21 +10,22 @@ export const MONO = Platform.select({ ios: "Menlo", android: "monospace", defaul
 export const APP_VERSION = "2.1.0";
 
 export const COLORS = {
-  background: "#0F1117", // --bg
-  card: "#171A24",       // --bg2 (Panel, Sidebar, Card)
-  cardSecondary: "#1E2130", // --bg3 (Hover, Inputs)
-  track: "#252A3A",      // --bg4 (Progress track)
-  primary: "#6C63FF",    // --accent (Mor)
-  income: "#48BB78",     // --green
-  expense: "#FC8181",    // --red
-  warning: "#F6E05E",    // --yellow
-  info: "#63B3ED",       // --blue
-  accent2: "#F687B3",    // --pink
-  text: "#E2E8F0",       // --text
-  textSecondary: "#A0Aec0", // --text2
-  textMuted: "#718096",  // --text3
-  border: "rgba(255,255,255,0.07)",
-  accent: "#6C63FF",
+  background: "#0A0D14",   // --bg  (FinFlow dark)
+  sidebar: "#0D1018",      // sidebar bg
+  card: "#131820",         // --bg2 (Panel, Card)
+  cardSecondary: "#1A2030", // --bg3 (Hover, Inputs)
+  track: "#1E2535",        // --bg4 (Progress track)
+  primary: "#00C9A7",      // --accent (Teal)
+  income: "#10b981",       // --green
+  expense: "#F87171",      // --red
+  warning: "#FBBF24",      // --yellow
+  info: "#60A5FA",         // --blue
+  accent2: "#F472B6",      // --pink
+  text: "#E2E8F0",         // --text
+  textSecondary: "#94A3B8", // --text2
+  textMuted: "#64748B",    // --text3
+  border: "rgba(255,255,255,0.06)",
+  accent: "#00C9A7",
 };
 
 export const RADII = {
@@ -113,6 +114,33 @@ export interface Debt {
   description?: string;
   dueDate?: string; // ISO
   isSettled?: boolean;
+  createdAt: string;
+  familyId?: string;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  company?: string;
+  email?: string;
+  phone?: string;
+  status: "active" | "lead" | "inactive";
+  totalRevenue?: number;
+  notes?: string;
+  tags?: string[];
+  createdAt: string;
+  familyId?: string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  priority: "high" | "medium" | "low";
+  status: "pending" | "completed";
+  dueDate?: string;
+  customerId?: string;
+  customerName?: string;
   createdAt: string;
   familyId?: string;
 }
