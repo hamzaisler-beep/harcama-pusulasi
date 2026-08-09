@@ -9,6 +9,7 @@ import {
   TextInput,
   ActivityIndicator,
   Platform,
+  useWindowDimensions,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { COLORS, MONO } from "../theme/constants";
@@ -28,6 +29,9 @@ const CURRENCIES = [
 ];
 
 export default function CurrencyScreen() {
+  const { width } = useWindowDimensions();
+  const mob = width < 600;
+
   // tryValue[code] = 1 birim code kaç TL eder
   const [tryValue, setTryValue] = useState<Record<string, number>>(FALLBACK_TRY);
   const [loading, setLoading] = useState(true);
@@ -80,10 +84,10 @@ export default function CurrencyScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollInside} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: mob ? 16 : 32 }} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Döviz & Kur</Text>
+          <Text style={[styles.title, mob && { fontSize: 22 }]}>Döviz & Kur</Text>
           <Text style={styles.subtitle}>
             {loading ? "Kurlar güncelleniyor..." : offline ? "⚠️ Bağlantı yok — tahmini kurlar" : `Güncel · ${updatedAt ? updatedAt.replace(" (UTC)", "") : ""}`}
           </Text>
@@ -94,11 +98,11 @@ export default function CurrencyScreen() {
       </View>
 
       {/* Rate cards */}
-      <View style={styles.cardsRow}>
+      <View style={[styles.cardsRow, mob && { flexDirection: "column" }]}>
         {["USD", "EUR", "GBP"].map((code) => {
           const c = CURRENCIES.find((x) => x.code === code)!;
           return (
-            <View key={code} style={styles.rateCard}>
+            <View key={code} style={[styles.rateCard, mob && { minWidth: 0 }]}>
               <Text style={styles.flag}>{c.flag}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.rateCode}>{code}/TRY</Text>
@@ -111,7 +115,7 @@ export default function CurrencyScreen() {
       </View>
 
       {/* Converter */}
-      <View style={styles.converter}>
+      <View style={[styles.converter, mob && { maxWidth: undefined }]}>
         <Text style={styles.convTitle}>ÇEVİRİCİ</Text>
 
         <Text style={styles.fieldLabel}>Tutar</Text>
@@ -163,7 +167,7 @@ const styles = StyleSheet.create({
   refreshBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: COLORS.card, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: COLORS.border },
 
   cardsRow: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginBottom: 24 },
-  rateCard: { flexDirection: "row", alignItems: "center", gap: 14, minWidth: 240, flex: 1, backgroundColor: COLORS.card, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: COLORS.border },
+  rateCard: { flexDirection: "row", alignItems: "center", gap: 14, minWidth: 200, flex: 1, backgroundColor: COLORS.card, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: COLORS.border },
   flag: { fontSize: 30 },
   rateCode: { color: "#fff", fontSize: 15, fontWeight: "800" },
   rateLabel: { color: COLORS.textMuted, fontSize: 11, marginTop: 2 },

@@ -12,6 +12,7 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
   Alert,
+  useWindowDimensions,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { parseISO, differenceInCalendarDays } from "date-fns";
@@ -35,6 +36,9 @@ const confirmDelete = (msg: string, onYes: () => void) => {
 };
 
 export default function GoalsScreen() {
+  const { width } = useWindowDimensions();
+  const mob = width < 600;
+
   const s = useStore();
   const goals = s.goals;
 
@@ -43,19 +47,18 @@ export default function GoalsScreen() {
   const [title, setTitle] = useState("");
   const [target, setTarget] = useState("");
   const [current, setCurrent] = useState("");
-  const [deadline, setDeadline] = useState(""); // YYYY-MM-DD
+  const [deadline, setDeadline] = useState("");
   const [icon, setIcon] = useState(ICONS[0]);
   const [color, setColor] = useState(COLORS.primary);
   const [saving, setSaving] = useState(false);
 
-  // Para ekleme modalı
   const [contribGoal, setContribGoal] = useState<Goal | null>(null);
   const [contribAmount, setContribAmount] = useState("");
 
   const totals = useMemo(() => {
     const saved = goals.reduce((acc, g) => acc + (Number(g.currentAmount) || 0), 0);
-    const target = goals.reduce((acc, g) => acc + (Number(g.targetAmount) || 0), 0);
-    return { saved, target, percent: target > 0 ? (saved / target) * 100 : 0 };
+    const tgt = goals.reduce((acc, g) => acc + (Number(g.targetAmount) || 0), 0);
+    return { saved, target: tgt, percent: tgt > 0 ? (saved / tgt) * 100 : 0 };
   }, [goals]);
 
   const openAdd = () => {
@@ -109,27 +112,29 @@ export default function GoalsScreen() {
     setContribAmount("");
   };
 
+  const pad = mob ? 16 : 32;
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollInside} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: pad }} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Hedefler</Text>
-          <Text style={styles.subtitle}>Birikim hedeflerinizi takip edin</Text>
+        <View style={{ flex: 1, marginRight: 12 }}>
+          <Text style={[styles.title, mob && { fontSize: 22 }]}>Hedefler</Text>
+          {!mob && <Text style={styles.subtitle}>Birikim hedeflerinizi takip edin</Text>}
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={openAdd}>
-          <MaterialIcons name="add" size={20} color="#fff" />
-          <Text style={styles.addBtnText}>Hedef Ekle</Text>
+          <MaterialIcons name="add" size={18} color="#fff" />
+          <Text style={styles.addBtnText}>{mob ? "Ekle" : "Hedef Ekle"}</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.summaryCard}>
+      <View style={[styles.summaryCard, mob && { padding: 16 }]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.netLabel}>TOPLAM BİRİKİM</Text>
-          <Text style={styles.netValue}>{formatTRY(totals.saved)}</Text>
+          <Text style={[styles.netValue, mob && { fontSize: 22 }]}>{formatTRY(totals.saved)}</Text>
           <Text style={styles.netSub}>Hedef: {formatTRY(totals.target)}</Text>
         </View>
-        <View style={styles.bigPercentBox}>
-          <Text style={styles.bigPercent}>{Math.round(totals.percent)}%</Text>
+        <View style={[styles.bigPercentBox, mob && { width: 64, height: 64, borderRadius: 32 }]}>
+          <Text style={[styles.bigPercent, mob && { fontSize: 16 }]}>{Math.round(totals.percent)}%</Text>
         </View>
       </View>
 
@@ -139,14 +144,14 @@ export default function GoalsScreen() {
           <Text style={styles.emptyText}>Henüz bir hedef yok. Hayalini planla!</Text>
         </View>
       ) : (
-        <View style={styles.grid}>
+        <View style={[styles.grid, mob && { flexDirection: "column" }]}>
           {goals.map((g) => {
             const pct = g.targetAmount > 0 ? Math.min((g.currentAmount / g.targetAmount) * 100, 100) : 0;
             const done = pct >= 100;
             const daysLeft = g.deadline ? differenceInCalendarDays(parseISO(g.deadline), new Date()) : null;
             const gColor = g.color || COLORS.primary;
             return (
-              <View key={g.id} style={styles.goalCard}>
+              <View key={g.id} style={[styles.goalCard, mob && { width: "100%" }]}>
                 <View style={styles.goalTop}>
                   <View style={[styles.goalIcon, { backgroundColor: gColor + "22" }]}>
                     <MaterialIcons name={(g.icon || "savings") as any} size={22} color={gColor} />
@@ -180,7 +185,7 @@ export default function GoalsScreen() {
                   </Text>
                   {daysLeft !== null && (
                     <Text style={[styles.daysText, { color: daysLeft < 0 ? COLORS.expense : COLORS.textMuted }]}>
-                      {daysLeft < 0 ? "Süre doldu" : `${daysLeft} gün kaldı`}
+                      {daysLeft < 0 ? "Süre doldu" : `${daysLeft} gün`}
                     </Text>
                   )}
                 </View>
@@ -188,10 +193,7 @@ export default function GoalsScreen() {
                 {!done && (
                   <TouchableOpacity
                     style={styles.contribBtn}
-                    onPress={() => {
-                      setContribGoal(g);
-                      setContribAmount("");
-                    }}
+                    onPress={() => { setContribGoal(g); setContribAmount(""); }}
                   >
                     <MaterialIcons name="add" size={16} color={gColor} />
                     <Text style={[styles.contribBtnText, { color: gColor }]}>Para Ekle</Text>
@@ -263,52 +265,51 @@ export default function GoalsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollInside: { padding: 32 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   title: { fontSize: 28, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
   subtitle: { fontSize: 13, color: COLORS.textMuted, marginTop: 4 },
-  addBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: COLORS.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
+  addBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: COLORS.primary, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
   addBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
 
-  summaryCard: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.card, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.border, marginBottom: 24 },
+  summaryCard: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.card, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: COLORS.border, marginBottom: 20 },
   netLabel: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1.2 },
-  netValue: { fontSize: 30, fontWeight: "900", color: COLORS.income, marginTop: 8, fontFamily: MONO },
+  netValue: { fontSize: 28, fontWeight: "900", color: COLORS.income, marginTop: 6, fontFamily: MONO },
   netSub: { fontSize: 12, color: COLORS.textMuted, marginTop: 4 },
-  bigPercentBox: { width: 84, height: 84, borderRadius: 42, borderWidth: 4, borderColor: COLORS.primary, alignItems: "center", justifyContent: "center" },
-  bigPercent: { fontSize: 22, fontWeight: "900", color: "#fff" },
+  bigPercentBox: { width: 80, height: 80, borderRadius: 40, borderWidth: 3, borderColor: COLORS.primary, alignItems: "center", justifyContent: "center" },
+  bigPercent: { fontSize: 20, fontWeight: "900", color: "#fff" },
 
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
-  goalCard: { width: 280, backgroundColor: COLORS.card, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: COLORS.border },
-  goalTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
-  goalIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  goalCard: { width: 280, backgroundColor: COLORS.card, borderRadius: 16, padding: 18, borderWidth: 1, borderColor: COLORS.border },
+  goalTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  goalIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   goalActions: { flexDirection: "row", gap: 2 },
   iconMini: { padding: 6 },
-  goalTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  goalAmounts: { fontSize: 14, marginTop: 6 },
-  track: { height: 8, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 4, overflow: "hidden", marginTop: 14 },
+  goalTitle: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  goalAmounts: { fontSize: 13, marginTop: 6 },
+  track: { height: 7, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 4, overflow: "hidden", marginTop: 12 },
   fill: { height: "100%", borderRadius: 4 },
   goalFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 },
   pctText: { fontSize: 12, fontWeight: "700" },
   daysText: { fontSize: 11 },
-  contribBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 16, paddingVertical: 10, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: COLORS.border },
+  contribBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: COLORS.border },
   contribBtnText: { fontWeight: "700", fontSize: 13 },
 
   emptyState: { alignItems: "center", justifyContent: "center", paddingVertical: 60 },
   emptyText: { color: COLORS.textMuted, fontSize: 14, marginTop: 16 },
 
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center", padding: 20 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center", padding: 16 },
   modalScroll: { width: "100%", maxWidth: 460, maxHeight: "90%" },
   modalContent: { width: "100%", maxWidth: 460, backgroundColor: COLORS.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: COLORS.border },
-  modalTitle: { fontSize: 20, fontWeight: "800", color: "#fff", marginBottom: 16 },
+  modalTitle: { fontSize: 19, fontWeight: "800", color: "#fff", marginBottom: 16 },
   hintText: { color: COLORS.textMuted, fontSize: 12, marginBottom: 12 },
-  input: { backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 14, color: "#fff", fontSize: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
+  input: { backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 14, color: "#fff", fontSize: 15, borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
   fieldLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: "700", marginTop: 4, marginBottom: 8 },
   iconRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   iconChoice: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: COLORS.border },
   iconChoiceActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   colorRow: { flexDirection: "row", gap: 12 },
-  colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "transparent" },
+  colorDot: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: "transparent" },
   colorDotActive: { borderColor: "#fff" },
-  saveBtn: { backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 20 },
+  saveBtn: { backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 18 },
   saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "800" },
 });

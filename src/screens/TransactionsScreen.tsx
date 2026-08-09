@@ -1,18 +1,19 @@
 // src/screens/TransactionsScreen.tsx
 import React, { useState, useMemo } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
   TextInput,
   Platform,
   Modal,
   KeyboardAvoidingView,
   TouchableWithoutFeedback,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { 
@@ -51,6 +52,9 @@ const CATEGORIES = [
 ];
 
 export default function TransactionsScreen() {
+    const { width } = useWindowDimensions();
+    const mob = width < 600;
+
     const [searchTerm, setSearchTerm] = useState("");
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isRangeModalVisible, setIsRangeModalVisible] = useState(false);
@@ -274,10 +278,10 @@ export default function TransactionsScreen() {
     }, [dateRange]);
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { padding: mob ? 12 : 32 }]}>
             {/* Header */}
-            <View style={styles.header}>
-                <Text style={styles.title}>İşlemler</Text>
+            <View style={[styles.header, mob && { marginBottom: 16 }]}>
+                <Text style={[styles.title, mob && { fontSize: 22 }]}>İşlemler</Text>
                 <View style={styles.headerActions}>
                     <TouchableOpacity style={styles.iconBtn} onPress={handleImportFile}>
                         <MaterialIcons name="file-upload" size={20} color={COLORS.primary} />
@@ -290,33 +294,33 @@ export default function TransactionsScreen() {
             </View>
 
             {/* Filters */}
-            <View style={styles.filterBar}>
-                <View style={styles.searchBox}>
+            <View style={[styles.filterBar, mob && { flexDirection: "column", gap: 8 }]}>
+                <View style={[styles.searchBox, mob && { width: "100%" }]}>
                     <MaterialIcons name="search" size={20} color={COLORS.textMuted} />
                     <TextInput style={styles.searchInput} placeholder="İşlem ara..." placeholderTextColor={COLORS.textMuted} value={searchTerm} onChangeText={setSearchTerm} />
                 </View>
-                <View style={styles.filterActions}>
-                    <FilterSelect label={filterType} active={filterType !== "Tümü"} onPress={() => setActiveDropdown(activeDropdown === "type" ? null : "type")} />
-                    <FilterSelect label={filterCategory} active={filterCategory !== "Tüm Kategoriler"} onPress={() => setActiveDropdown(activeDropdown === "category" ? null : "category")} />
-                    <FilterSelect label={rangeText} active={true} onPress={() => setIsRangeModalVisible(true)} />
+                <View style={[styles.filterActions, mob && { width: "100%" }]}>
+                    <FilterSelect label={filterType} active={filterType !== "Tümü"} onPress={() => setActiveDropdown(activeDropdown === "type" ? null : "type")} mob={mob} />
+                    <FilterSelect label={mob ? "Kategori" : filterCategory} active={filterCategory !== "Tüm Kategoriler"} onPress={() => setActiveDropdown(activeDropdown === "category" ? null : "category")} mob={mob} />
+                    <FilterSelect label={rangeText} active={true} onPress={() => setIsRangeModalVisible(true)} mob={mob} />
                 </View>
             </View>
 
             {/* Dropdowns */}
             {activeDropdown === "type" && (
-                <DropdownMenu items={["Tümü", "Gelir", "Gider"]} current={filterType} onSelect={(val: any) => {setFilterType(val); setActiveDropdown(null);}} top={145} right={260} />
+                <DropdownMenu items={["Tümü", "Gelir", "Gider"]} current={filterType} onSelect={(val: any) => {setFilterType(val); setActiveDropdown(null);}} top={mob ? 180 : 145} right={mob ? 0 : 260} left={mob ? 0 : undefined} />
             )}
             {activeDropdown === "category" && (
-                <DropdownMenu items={[{label: "Tüm Kategoriler", icon: "check"}, ...CATEGORIES]} current={filterCategory} onSelect={(c: any) => {setFilterCategory(c.label || c); setActiveDropdown(null);}} top={145} right={120} hasIcons />
+                <DropdownMenu items={[{label: "Tüm Kategoriler", icon: "check"}, ...CATEGORIES]} current={filterCategory} onSelect={(c: any) => {setFilterCategory(c.label || c); setActiveDropdown(null);}} top={mob ? 180 : 145} right={mob ? 0 : 120} left={mob ? 0 : undefined} hasIcons />
             )}
 
             {/* Summary */}
-            <View style={styles.summaryRow}>
+            <View style={[styles.summaryRow, mob && { flexWrap: "wrap", gap: 8 }]}>
                 <View style={[styles.summaryPill, { backgroundColor: COLORS.income + "15" }]}>
-                    <Text style={[styles.pillText, { color: COLORS.income }]}>+ ₺{new Intl.NumberFormat("tr-TR").format(summary.income)}</Text>
+                    <Text style={[styles.pillText, { color: COLORS.income }]}>+₺{new Intl.NumberFormat("tr-TR").format(summary.income)}</Text>
                 </View>
                 <View style={[styles.summaryPill, { backgroundColor: COLORS.expense + "15" }]}>
-                    <Text style={[styles.pillText, { color: COLORS.expense }]}>- ₺{new Intl.NumberFormat("tr-TR").format(summary.expense)}</Text>
+                    <Text style={[styles.pillText, { color: COLORS.expense }]}>-₺{new Intl.NumberFormat("tr-TR").format(summary.expense)}</Text>
                 </View>
                 <Text style={styles.netLabel}>Net: <Text style={{ color: COLORS.warning, fontWeight: '700' }}>₺{new Intl.NumberFormat("tr-TR").format(summary.net)}</Text></Text>
             </View>
@@ -429,15 +433,15 @@ export default function TransactionsScreen() {
     );
 }
 
-const FilterSelect = ({ label, active, onPress }: any) => (
-    <TouchableOpacity onPress={onPress} style={[styles.filterBox, active && styles.filterBoxActive]}>
-        <Text style={[styles.filterLabel, active && {color: '#fff'}]}>{label}</Text>
+const FilterSelect = ({ label, active, onPress, mob }: any) => (
+    <TouchableOpacity onPress={onPress} style={[styles.filterBox, active && styles.filterBoxActive, mob && { flex: 1 }]}>
+        <Text style={[styles.filterLabel, active && {color: '#fff'}, mob && { fontSize: 11 }]} numberOfLines={1}>{label}</Text>
         <MaterialIcons name="keyboard-arrow-down" size={18} color={active ? COLORS.primary : COLORS.textMuted} />
     </TouchableOpacity>
 );
 
-const DropdownMenu = ({ items, onSelect, current, top, right, hasIcons }: any) => (
-    <View style={[styles.dropdown, { top, right }]}>
+const DropdownMenu = ({ items, onSelect, current, top, right, left, hasIcons }: any) => (
+    <View style={[styles.dropdown, { top, right: right ?? undefined, left: left ?? undefined }]}>
         <ScrollView style={{ maxHeight: 300 }}>
             {items.map((item: any) => {
                 const label = item.label || item;
@@ -508,8 +512,8 @@ const getIconName = (cat: string) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 32, backgroundColor: COLORS.background },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 32 },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   title: { fontSize: 28, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 12 },
   iconBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: COLORS.card, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: COLORS.border },
@@ -526,7 +530,7 @@ const styles = StyleSheet.create({
   dropdownItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8 },
   dropdownItemActive: { backgroundColor: "rgba(108,99,255,0.08)" },
   dropdownText: { color: COLORS.textSecondary, fontSize: 13, flex: 1 },
-  summaryRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 32 },
+  summaryRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
   summaryPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   pillText: { fontSize: 12, fontWeight: "800" },
   netLabel: { color: COLORS.textSecondary, fontSize: 12 },

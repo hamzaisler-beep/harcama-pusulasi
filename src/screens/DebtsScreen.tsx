@@ -12,6 +12,7 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
   Alert,
+  useWindowDimensions,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
@@ -35,6 +36,9 @@ const confirmDelete = (msg: string, onYes: () => void) => {
 };
 
 export default function DebtsScreen() {
+  const { width } = useWindowDimensions();
+  const mob = width < 600;
+
   const s = useStore();
   const debts = s.debts;
 
@@ -108,14 +112,14 @@ export default function DebtsScreen() {
         <View style={[styles.avatar, { backgroundColor: accent + "22" }]}>
           <Text style={[styles.avatarText, { color: accent }]}>{d.person.substring(0, 1).toUpperCase()}</Text>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.person, d.isSettled && styles.strike]}>{d.person}</Text>
-          <Text style={styles.meta}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[styles.person, d.isSettled && styles.strike]} numberOfLines={1}>{d.person}</Text>
+          <Text style={styles.meta} numberOfLines={1}>
             {d.description ? d.description : t === "owe" ? "Vereceğim" : "Alacağım"}
             {d.dueDate ? ` • ${format(parseISO(d.dueDate), "d MMM", { locale: tr })}` : ""}
           </Text>
         </View>
-        <View style={{ alignItems: "flex-end", marginRight: 8 }}>
+        <View style={{ alignItems: "flex-end", marginRight: 4 }}>
           <Text style={[styles.amount, { color: d.isSettled ? COLORS.textMuted : accent }]}>{formatTRY(d.amount)}</Text>
           {d.isSettled && <Text style={styles.settledTag}>Kapandı</Text>}
         </View>
@@ -132,37 +136,38 @@ export default function DebtsScreen() {
     ));
   };
 
+  const pad = mob ? 16 : 32;
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollInside} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: pad }} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Borç / Alacak</Text>
-          <Text style={styles.subtitle}>Kime borçlusun, kim sana borçlu?</Text>
+          <Text style={[styles.title, mob && { fontSize: 22 }]}>Borç / Alacak</Text>
+          {!mob && <Text style={styles.subtitle}>Kime borçlusun, kim sana borçlu?</Text>}
         </View>
       </View>
 
       {/* Stat row */}
-      <View style={styles.statRow}>
-        <View style={styles.statBox}>
+      <View style={[styles.statRow, mob && { gap: 10 }]}>
+        <View style={[styles.statBox, mob && { padding: 14 }]}>
           <Text style={styles.statLabel}>VERECEĞİM</Text>
-          <Text style={[styles.statValue, { color: COLORS.expense }]}>{formatTRY(totals.totalOwe)}</Text>
+          <Text style={[styles.statValue, { color: COLORS.expense }, mob && { fontSize: 16 }]}>{formatTRY(totals.totalOwe)}</Text>
         </View>
-        <View style={styles.statBox}>
+        <View style={[styles.statBox, mob && { padding: 14 }]}>
           <Text style={styles.statLabel}>ALACAĞIM</Text>
-          <Text style={[styles.statValue, { color: COLORS.income }]}>{formatTRY(totals.totalOwed)}</Text>
+          <Text style={[styles.statValue, { color: COLORS.income }, mob && { fontSize: 16 }]}>{formatTRY(totals.totalOwed)}</Text>
         </View>
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>NET DURUM</Text>
-          <Text style={[styles.statValue, { color: totals.net >= 0 ? COLORS.income : COLORS.expense }]}>
-            {totals.net >= 0 ? "+" : ""}
-            {formatTRY(totals.net)}
+        <View style={[styles.statBox, mob && { padding: 14 }]}>
+          <Text style={styles.statLabel}>NET</Text>
+          <Text style={[styles.statValue, { color: totals.net >= 0 ? COLORS.income : COLORS.expense }, mob && { fontSize: 16 }]}>
+            {totals.net >= 0 ? "+" : ""}{formatTRY(totals.net)}
           </Text>
         </View>
       </View>
 
-      <View style={styles.grid}>
+      <View style={[styles.grid, mob && { flexDirection: "column", gap: 16 }]}>
         {/* Vereceklerim */}
-        <View style={[styles.panel, { flex: 1 }]}>
+        <View style={[styles.panel, { flex: 1 }, mob && { minWidth: 0 }]}>
           <View style={styles.panelHeader}>
             <Text style={styles.panelTitle}>VERECEKLERİM</Text>
             <TouchableOpacity style={styles.smallAdd} onPress={() => openAdd("owe")}>
@@ -174,7 +179,7 @@ export default function DebtsScreen() {
         </View>
 
         {/* Alacaklarım */}
-        <View style={[styles.panel, { flex: 1 }]}>
+        <View style={[styles.panel, { flex: 1 }, mob && { minWidth: 0 }]}>
           <View style={styles.panelHeader}>
             <Text style={styles.panelTitle}>ALACAKLARIM</Text>
             <TouchableOpacity style={styles.smallAdd} onPress={() => openAdd("owed")}>
@@ -221,42 +226,41 @@ export default function DebtsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollInside: { padding: 32 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   title: { fontSize: 28, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
   subtitle: { fontSize: 13, color: COLORS.textMuted, marginTop: 4 },
 
-  statRow: { flexDirection: "row", gap: 16, marginBottom: 24 },
-  statBox: { flex: 1, backgroundColor: COLORS.card, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: COLORS.border },
-  statLabel: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1 },
-  statValue: { fontSize: 22, fontWeight: "900", marginTop: 8, fontFamily: MONO },
+  statRow: { flexDirection: "row", gap: 14, marginBottom: 20 },
+  statBox: { flex: 1, backgroundColor: COLORS.card, borderRadius: 14, padding: 18, borderWidth: 1, borderColor: COLORS.border },
+  statLabel: { fontSize: 10, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 0.8 },
+  statValue: { fontSize: 20, fontWeight: "900", marginTop: 6, fontFamily: MONO },
 
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 24 },
-  panel: { minWidth: 300, backgroundColor: COLORS.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: COLORS.border },
-  panelHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 20 },
+  panel: { minWidth: 300, backgroundColor: COLORS.card, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: COLORS.border },
+  panelHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
   panelTitle: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1.2 },
   smallAdd: { flexDirection: "row", alignItems: "center", gap: 4 },
   smallAddText: { fontSize: 12, fontWeight: "700" },
 
-  debtRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.03)" },
+  debtRow: { flexDirection: "row", alignItems: "center", paddingVertical: 11, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.03)" },
   debtRowSettled: { opacity: 0.55 },
-  avatar: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", marginRight: 12 },
-  avatarText: { fontWeight: "800", fontSize: 15 },
+  avatar: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", marginRight: 10 },
+  avatarText: { fontWeight: "800", fontSize: 14 },
   person: { color: "#fff", fontSize: 14, fontWeight: "700" },
   strike: { textDecorationLine: "line-through" },
   meta: { color: COLORS.textMuted, fontSize: 11, marginTop: 2 },
-  amount: { fontSize: 15, fontWeight: "800", fontFamily: MONO },
+  amount: { fontSize: 14, fontWeight: "800", fontFamily: MONO },
   settledTag: { fontSize: 9, color: COLORS.textMuted, marginTop: 2 },
-  iconMini: { padding: 6 },
-  emptyText: { color: COLORS.textMuted, fontSize: 13, textAlign: "center", paddingVertical: 24 },
+  iconMini: { padding: 5 },
+  emptyText: { color: COLORS.textMuted, fontSize: 13, textAlign: "center", paddingVertical: 20 },
 
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center", padding: 20 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center", padding: 16 },
   modalContent: { width: "100%", maxWidth: 460, backgroundColor: COLORS.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: COLORS.border },
-  modalTitle: { fontSize: 20, fontWeight: "800", color: "#fff", marginBottom: 20 },
+  modalTitle: { fontSize: 19, fontWeight: "800", color: "#fff", marginBottom: 18 },
   typeRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
   typeBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 10, backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: COLORS.border },
   typeBtnText: { color: COLORS.textMuted, fontWeight: "700", fontSize: 13 },
-  input: { backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 14, color: "#fff", fontSize: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
-  saveBtn: { backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 12 },
+  input: { backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 14, color: "#fff", fontSize: 15, borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
+  saveBtn: { backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 10 },
   saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "800" },
 });

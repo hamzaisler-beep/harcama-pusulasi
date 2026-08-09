@@ -284,11 +284,11 @@ export default function DashboardScreen() {
 
       {/* Profile Settings Modal */}
       <Modal visible={isProfileModalVisible} transparent animationType="fade">
-          <View style={styles.profileModalOverlay}>
+          <View style={[styles.profileModalOverlay, !isDesktop && { justifyContent: "center", alignItems: "center" }]}>
               <TouchableWithoutFeedback onPress={() => setIsProfileModalVisible(false)}>
                   <View style={StyleSheet.absoluteFill} />
               </TouchableWithoutFeedback>
-              <View style={styles.profileModalContent}>
+              <View style={[styles.profileModalContent, !isDesktop && { position: "relative", top: 0, left: 0, width: "90%", maxWidth: 380 }]}>
                   <View style={styles.profileModalHeader}>
                       <View style={styles.largeAvatar}>
                           <Text style={styles.largeAvatarText}>
@@ -531,11 +531,11 @@ const CustomDoughnut = ({ data, total }: any) => {
 
 const StatBox = ({ title, value, color, sub, icon }: any) => (
     <View style={[styles.statBox, { borderTopColor: color }]}>
-        <Text style={styles.statBoxTitle}>{title}</Text>
-        <Text style={[styles.statBoxValue, { color: title === "Bu Ay Gider" ? COLORS.expense : color }]}>
+        <Text style={styles.statBoxTitle} numberOfLines={1}>{title}</Text>
+        <Text style={[styles.statBoxValue, { color: title === "Bu Ay Gider" ? COLORS.expense : color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
             ₺{new Intl.NumberFormat("tr-TR").format(value)}
         </Text>
-        <Text style={styles.statBoxSub}>{sub}</Text>
+        <Text style={styles.statBoxSub} numberOfLines={1}>{sub}</Text>
         <View style={styles.statBoxIcon}>
             <MaterialIcons name={icon} size={32} color={color} style={{ opacity: 0.15 }} />
         </View>
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
   statRow: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginBottom: 24 },
   statBox: { flexGrow: 1, flexBasis: 150, minWidth: 150, backgroundColor: COLORS.card, borderRadius: 10, padding: 20, borderTopWidth: 3, position: "relative", minHeight: 120 },
   statBoxTitle: { fontSize: 12, color: COLORS.textMuted, fontWeight: "600", marginBottom: 10 },
-  statBoxValue: { fontSize: 26, fontWeight: "800", marginBottom: 6, fontFamily: MONO },
+  statBoxValue: { fontSize: 22, fontWeight: "800", marginBottom: 6, fontFamily: MONO },
   statBoxSub: { fontSize: 11, color: COLORS.textMuted },
   statBoxIcon: { position: "absolute", right: 16, bottom: 16 },
 

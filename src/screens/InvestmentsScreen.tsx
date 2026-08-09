@@ -1,24 +1,22 @@
 // src/screens/InvestmentsScreen.tsx
 import React, { useState, useMemo } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  Dimensions, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
   Platform,
   Modal,
   TextInput,
   KeyboardAvoidingView,
-  TouchableWithoutFeedback
+  TouchableWithoutFeedback,
+  useWindowDimensions,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import Svg, { Circle } from "react-native-svg";
 import { store } from "../store";
 import { COLORS, MONO, Investment } from "../theme/constants";
-
-const { width } = Dimensions.get("window");
 
 const ASSET_TYPES = [
     { label: "Hisse", icon: "analytics" },
@@ -29,6 +27,9 @@ const ASSET_TYPES = [
 ];
 
 export default function InvestmentsScreen() {
+    const { width } = useWindowDimensions();
+    const mob = width < 600;
+
     const [tick, setTick] = React.useState(0);
     const [isEditModalVisible, setIsEditModalVisible] = React.useState(false);
     const [selectedAsset, setSelectedAsset] = React.useState<Investment | null>(null);
@@ -118,10 +119,10 @@ export default function InvestmentsScreen() {
     };
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.scrollInside} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.container} contentContainerStyle={{ padding: mob ? 16 : 32 }} showsVerticalScrollIndicator={false}>
             {/* Header Area */}
             <View style={styles.headerRow}>
-                <Text style={styles.title}>Varlıklarım</Text>
+                <Text style={[styles.title, mob && { fontSize: 20 }]}>Varlıklarım</Text>
                 <TouchableOpacity style={styles.addBtn} onPress={handleAddNew}>
                     <MaterialIcons name="add" size={20} color="#000" />
                     <Text style={styles.addBtnText}>Varlık Ekle</Text>
@@ -129,19 +130,19 @@ export default function InvestmentsScreen() {
             </View>
 
             {/* Header Stats */}
-            <View style={styles.statRow}>
-                <InvestmentStatBox title="Toplam Maliyet" value={stats.totalCost} color={COLORS.primary} icon="work" />
-                <InvestmentStatBox title="Güncel Değer" value={stats.totalValue} color={COLORS.info} icon="trending-up" />
-                <InvestmentStatBox title="Kar / Zarar" value={stats.profit} color={COLORS.income} sub={`(%${stats.profitPercent.toFixed(1)})`} icon="auto-graph" />
+            <View style={[styles.statRow, mob && { flexDirection: "column", gap: 10 }]}>
+                <InvestmentStatBox title="Toplam Maliyet" value={stats.totalCost} color={COLORS.primary} icon="work" mob={mob} />
+                <InvestmentStatBox title="Güncel Değer" value={stats.totalValue} color={COLORS.info} icon="trending-up" mob={mob} />
+                <InvestmentStatBox title="Kar / Zarar" value={stats.profit} color={COLORS.income} sub={`(%${stats.profitPercent.toFixed(1)})`} icon="auto-graph" mob={mob} />
             </View>
 
             {/* Charts Row */}
-            <View style={styles.chartsRow}>
-                <View style={[styles.panel, { flex: 0.8 }]}>
+            <View style={[styles.chartsRow, mob && { flexDirection: "column", gap: 16 }]}>
+                <View style={[styles.panel, { flex: 0.8 }, mob && { flex: undefined }]}>
                     <Text style={styles.panelTitle}>PORTFÖY DAĞILIMI</Text>
                     <PortfolioDoughnut data={assets} />
                 </View>
-                <View style={[styles.panel, { flex: 1.2 }]}>
+                <View style={[styles.panel, { flex: 1.2 }, mob && { flex: undefined }]}>
                     <Text style={styles.panelTitle}>PERFORMANS (₺)</Text>
                     <PerformanceChart data={assets} />
                 </View>
@@ -150,6 +151,7 @@ export default function InvestmentsScreen() {
             {/* Portfolio Table */}
             <View style={styles.panel}>
                 <Text style={styles.panelTitle}>PORTFÖY DETAYI</Text>
+                <ScrollView horizontal={mob} showsHorizontalScrollIndicator={mob}>
                 <View style={styles.tableHeader}>
                     <Text style={[styles.th, { flex: 1.5 }]}>VARLIK</Text>
                     <Text style={[styles.th, { flex: 1 }]}>TÜR</Text>
@@ -191,6 +193,7 @@ export default function InvestmentsScreen() {
                         </View>
                     );
                 })}
+                </ScrollView>
             </View>
 
             {/* Edit Modal */}
@@ -259,12 +262,12 @@ export default function InvestmentsScreen() {
     );
 }
 
-const InvestmentStatBox = ({ title, value, color, sub, icon }: any) => (
+const InvestmentStatBox = ({ title, value, color, sub, icon, mob }: any) => (
     <View style={styles.statBox}>
         <Text style={styles.statLabel}>{title}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-            <Text style={[styles.statValue, { color }]}>₺{new Intl.NumberFormat("tr-TR").format(value)}</Text>
-            {sub && <Text style={{ color, fontSize: 14, fontWeight: '600' }}>{sub}</Text>}
+            <Text style={[styles.statValue, { color }, mob && { fontSize: 20 }]}>₺{new Intl.NumberFormat("tr-TR").format(value)}</Text>
+            {sub && <Text style={{ color, fontSize: 13, fontWeight: '600' }}>{sub}</Text>}
         </View>
         <View style={styles.statIconBox}><MaterialIcons name={icon} size={24} color={color} style={{ opacity: 0.2 }} /></View>
     </View>
