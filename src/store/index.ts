@@ -20,6 +20,8 @@ import {
   Investment,
   Goal,
   Debt,
+  Customer,
+  Task,
 } from "../theme/constants";
 
 const byDateDesc = (a: { date?: string }, b: { date?: string }) =>
@@ -35,6 +37,8 @@ class GlobalStore {
   budgets: Budget[] = [];
   goals: Goal[] = [];
   debts: Debt[] = [];
+  customers: Customer[] = [];
+  tasks: Task[] = [];
 
   familyId: string | null = null;
   ready = false;
@@ -69,6 +73,8 @@ class GlobalStore {
     this.budgets = [];
     this.goals = [];
     this.debts = [];
+    this.customers = [];
+    this.tasks = [];
     this.familyId = null;
     this.ready = false;
     this.notify();
@@ -113,6 +119,8 @@ class GlobalStore {
     this.sync<Budget>("budgets", id, (r) => (this.budgets = r), byCreatedDesc);
     this.sync<Goal>("goals", id, (r) => (this.goals = r), byCreatedDesc);
     this.sync<Debt>("debts", id, (r) => (this.debts = r), byCreatedDesc);
+    this.sync<Customer>("customers", id, (r) => (this.customers = r), byCreatedDesc);
+    this.sync<Task>("tasks", id, (r) => (this.tasks = r), byCreatedDesc);
   }
 
   // --- Genel yardımcılar ---
@@ -213,6 +221,28 @@ class GlobalStore {
   }
   deleteInvestment(id: string) {
     return this.remove("investments", id);
+  }
+
+  // --- Müşteriler ---
+  addCustomer(c: Omit<Customer, "id" | "createdAt"> & { createdAt?: string }) {
+    return this.create("customers", c);
+  }
+  updateCustomer(id: string, c: Partial<Customer>) {
+    return this.patch("customers", id, c);
+  }
+  deleteCustomer(id: string) {
+    return this.remove("customers", id);
+  }
+
+  // --- Görevler ---
+  addTask(t: Omit<Task, "id" | "createdAt"> & { createdAt?: string }) {
+    return this.create("tasks", t);
+  }
+  updateTask(id: string, t: Partial<Task>) {
+    return this.patch("tasks", id, t);
+  }
+  deleteTask(id: string) {
+    return this.remove("tasks", id);
   }
 }
 

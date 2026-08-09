@@ -1,259 +1,181 @@
 // src/screens/GoalsScreen.tsx
-import React, { useMemo, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Modal,
-  Platform,
-  TouchableWithoutFeedback,
-  ActivityIndicator,
-  Alert,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Modal, TextInput, ActivityIndicator, Alert
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { parseISO, differenceInCalendarDays } from "date-fns";
+import { format } from "date-fns";
 import { store } from "../store";
-import { useStore } from "../hooks/useStore";
 import { COLORS, MONO, Goal } from "../theme/constants";
 import { formatTRY } from "../utils/format";
 
-const ICONS = ["savings", "flight", "home", "directions-car", "school", "phone-iphone", "favorite", "beach-access"];
-const COLOR_CHOICES = [COLORS.primary, COLORS.income, COLORS.info, COLORS.warning, COLORS.accent2];
-
-const confirmDelete = (msg: string, onYes: () => void) => {
-  if (Platform.OS === "web") {
-    if (window.confirm(msg)) onYes();
-  } else {
-    Alert.alert("Sil", msg, [
-      { text: "Vazgeç", style: "cancel" },
-      { text: "Sil", style: "destructive", onPress: onYes },
-    ]);
-  }
-};
+const GOAL_EMOJIS = ["🏖️", "📱", "🏠", "🚗", "✈️", "💍", "🎓", "💪", "💻", "🎸", "⚽", "🌍"];
 
 export default function GoalsScreen() {
-  const s = useStore();
-  const goals = s.goals;
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Goal | null>(null);
+  const [tick, setTick] = useState(0);
+  const [modal, setModal] = useState<"add" | "edit" | "deposit" | "withdraw" | null>(null);
+  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [title, setTitle] = useState("");
   const [target, setTarget] = useState("");
   const [current, setCurrent] = useState("");
-  const [deadline, setDeadline] = useState(""); // YYYY-MM-DD
-  const [icon, setIcon] = useState(ICONS[0]);
-  const [color, setColor] = useState(COLORS.primary);
-  const [saving, setSaving] = useState(false);
+  const [deadline, setDeadline] = useState("");
+  const [emoji, setEmoji] = useState("🏖️");
+  const [txAmount, setTxAmount] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  // Para ekleme modalı
-  const [contribGoal, setContribGoal] = useState<Goal | null>(null);
-  const [contribAmount, setContribAmount] = useState("");
+  useEffect(() => {
+    const fn = () => setTick(t => t + 1);
+    store.listeners.add(fn);
+    return () => { store.listeners.delete(fn); };
+  }, []);
 
-  const totals = useMemo(() => {
-    const saved = goals.reduce((acc, g) => acc + (Number(g.currentAmount) || 0), 0);
-    const target = goals.reduce((acc, g) => acc + (Number(g.targetAmount) || 0), 0);
-    return { saved, target, percent: target > 0 ? (saved / target) * 100 : 0 };
-  }, [goals]);
-
-  const openAdd = () => {
-    setEditing(null);
-    setTitle("");
-    setTarget("");
-    setCurrent("");
-    setDeadline("");
-    setIcon(ICONS[0]);
-    setColor(COLORS.primary);
-    setModalOpen(true);
-  };
-
-  const openEdit = (g: Goal) => {
-    setEditing(g);
-    setTitle(g.title);
-    setTarget(String(g.targetAmount));
-    setCurrent(String(g.currentAmount));
-    setDeadline(g.deadline ? g.deadline.substring(0, 10) : "");
-    setIcon(g.icon || ICONS[0]);
-    setColor(g.color || COLORS.primary);
-    setModalOpen(true);
-  };
+  const openAdd = () => { setTitle(""); setTarget(""); setCurrent("0"); setDeadline(""); setEmoji("🏖️"); setModal("add"); };
+  const openEdit = (g: Goal) => { setSelectedGoal(g); setTitle(g.title); setTarget(String(g.targetAmount)); setCurrent(String(g.currentAmount)); setDeadline(g.deadline || ""); setEmoji(g.icon || "🏖️"); setModal("edit"); };
+  const openDeposit = (g: Goal) => { setSelectedGoal(g); setTxAmount(""); setModal("deposit"); };
+  const openWithdraw = (g: Goal) => { setSelectedGoal(g); setTxAmount(""); setModal("withdraw"); };
+  const closeModal = () => { setModal(null); setSelectedGoal(null); };
 
   const handleSave = async () => {
     if (!title.trim() || !target) return;
-    setSaving(true);
+    setBusy(true);
     try {
-      const payload = {
-        title: title.trim(),
-        targetAmount: Number(target) || 0,
-        currentAmount: Number(current) || 0,
-        deadline: deadline ? new Date(deadline).toISOString() : "",
-        icon,
-        color,
-      };
-      if (editing) await store.updateGoal(editing.id, payload);
-      else await store.addGoal(payload);
-      setModalOpen(false);
-    } finally {
-      setSaving(false);
-    }
+      const tgt = parseFloat(target.replace(",", ".")) || 0;
+      const cur = parseFloat(current.replace(",", ".")) || 0;
+      if (modal === "add") {
+        await store.addGoal({ title: title.trim(), targetAmount: tgt, currentAmount: cur, deadline: deadline || undefined, icon: emoji, color: COLORS.primary, createdAt: new Date().toISOString() });
+      } else if (selectedGoal) {
+        await store.updateGoal(selectedGoal.id, { title: title.trim(), targetAmount: tgt, currentAmount: cur, deadline: deadline || undefined, icon: emoji });
+      }
+      closeModal();
+    } finally { setBusy(false); }
   };
 
-  const handleContribute = async () => {
-    if (!contribGoal || !contribAmount) return;
-    const add = Number(contribAmount) || 0;
-    const next = Math.max(0, (Number(contribGoal.currentAmount) || 0) + add);
-    await store.updateGoal(contribGoal.id, { currentAmount: next });
-    setContribGoal(null);
-    setContribAmount("");
+  const handleTransaction = async () => {
+    if (!selectedGoal || !txAmount) return;
+    setBusy(true);
+    try {
+      const amt = parseFloat(txAmount.replace(",", ".")) || 0;
+      const newAmt = modal === "deposit"
+        ? selectedGoal.currentAmount + amt
+        : Math.max(0, selectedGoal.currentAmount - amt);
+      await store.updateGoal(selectedGoal.id, { currentAmount: newAmt });
+      closeModal();
+    } finally { setBusy(false); }
+  };
+
+  const handleDelete = (id: string, goalTitle: string) => {
+    Alert.alert("Hedefi Sil", `"${goalTitle}" hedefini silmek istiyor musunuz?`, [
+      { text: "Vazgeç", style: "cancel" },
+      { text: "Sil", style: "destructive", onPress: () => store.deleteGoal(id) },
+    ]);
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollInside} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Hedefler</Text>
-          <Text style={styles.subtitle}>Birikim hedeflerinizi takip edin</Text>
-        </View>
-        <TouchableOpacity style={styles.addBtn} onPress={openAdd}>
-          <MaterialIcons name="add" size={20} color="#fff" />
-          <Text style={styles.addBtnText}>Hedef Ekle</Text>
+    <ScrollView style={s.container} contentContainerStyle={[s.scroll, { paddingBottom: 80 }]}>
+      <View style={s.header}>
+        <Text style={s.pageTitle}>Hedefler</Text>
+        <TouchableOpacity style={s.addBtn} onPress={openAdd}>
+          <MaterialIcons name="add" size={16} color="#000" />
+          <Text style={s.addBtnText}>+ Hedef</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.summaryCard}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.netLabel}>TOPLAM BİRİKİM</Text>
-          <Text style={styles.netValue}>{formatTRY(totals.saved)}</Text>
-          <Text style={styles.netSub}>Hedef: {formatTRY(totals.target)}</Text>
-        </View>
-        <View style={styles.bigPercentBox}>
-          <Text style={styles.bigPercent}>{Math.round(totals.percent)}%</Text>
-        </View>
-      </View>
-
-      {goals.length === 0 ? (
-        <View style={styles.emptyState}>
-          <MaterialIcons name="flag" size={48} color={COLORS.textMuted} style={{ opacity: 0.4 }} />
-          <Text style={styles.emptyText}>Henüz bir hedef yok. Hayalini planla!</Text>
+      {store.goals.length === 0 ? (
+        <View style={s.emptyWrap}>
+          <Text style={s.emptyIcon}>🏆</Text>
+          <Text style={s.emptyText}>Henüz hedef eklenmedi.</Text>
+          <TouchableOpacity style={s.emptyBtn} onPress={openAdd}>
+            <Text style={s.emptyBtnText}>İlk Hedefini Ekle</Text>
+          </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.grid}>
-          {goals.map((g) => {
+        <View style={s.grid}>
+          {store.goals.map((g) => {
             const pct = g.targetAmount > 0 ? Math.min((g.currentAmount / g.targetAmount) * 100, 100) : 0;
-            const done = pct >= 100;
-            const daysLeft = g.deadline ? differenceInCalendarDays(parseISO(g.deadline), new Date()) : null;
-            const gColor = g.color || COLORS.primary;
             return (
-              <View key={g.id} style={styles.goalCard}>
-                <View style={styles.goalTop}>
-                  <View style={[styles.goalIcon, { backgroundColor: gColor + "22" }]}>
-                    <MaterialIcons name={(g.icon || "savings") as any} size={22} color={gColor} />
+              <View key={g.id} style={s.goalCard}>
+                <View style={s.cardTop}>
+                  <View style={s.goalIconWrap}>
+                    <Text style={{ fontSize: 24 }}>{g.icon || "🏆"}</Text>
                   </View>
-                  <View style={styles.goalActions}>
-                    <TouchableOpacity onPress={() => openEdit(g)} style={styles.iconMini}>
-                      <MaterialIcons name="edit" size={16} color={COLORS.textMuted} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => confirmDelete(`"${g.title}" hedefini silmek istiyor musunuz?`, () => store.deleteGoal(g.id))}
-                      style={styles.iconMini}
-                    >
+                  <View style={s.cardActions}>
+                    <TouchableOpacity onPress={() => openEdit(g)} style={s.iconBtn}><Text>✏️</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDelete(g.id, g.title)} style={s.iconBtn}>
                       <MaterialIcons name="delete-outline" size={16} color={COLORS.textMuted} />
                     </TouchableOpacity>
                   </View>
                 </View>
-
-                <Text style={styles.goalTitle}>{g.title}</Text>
-                <Text style={styles.goalAmounts}>
-                  <Text style={{ color: COLORS.text, fontWeight: "800" }}>{formatTRY(g.currentAmount)}</Text>
-                  <Text style={{ color: COLORS.textMuted }}> / {formatTRY(g.targetAmount)}</Text>
-                </Text>
-
-                <View style={styles.track}>
-                  <View style={[styles.fill, { width: `${pct}%`, backgroundColor: done ? COLORS.income : gColor }]} />
+                <Text style={s.goalTitle}>{g.title}</Text>
+                {g.deadline && <Text style={s.goalDeadline}>Hedef: {formatTRY(g.targetAmount)} · {g.deadline}</Text>}
+                <Text style={s.goalCurrent}>{formatTRY(g.currentAmount)}</Text>
+                <Text style={s.goalPct}>%{Math.round(pct)}</Text>
+                <View style={s.barTrack}>
+                  <View style={[s.barFill, { width: `${pct}%` as any }]} />
                 </View>
-
-                <View style={styles.goalFooter}>
-                  <Text style={[styles.pctText, { color: done ? COLORS.income : COLORS.textSecondary }]}>
-                    {done ? "🎉 Tamamlandı" : `%${Math.round(pct)}`}
-                  </Text>
-                  {daysLeft !== null && (
-                    <Text style={[styles.daysText, { color: daysLeft < 0 ? COLORS.expense : COLORS.textMuted }]}>
-                      {daysLeft < 0 ? "Süre doldu" : `${daysLeft} gün kaldı`}
-                    </Text>
-                  )}
-                </View>
-
-                {!done && (
-                  <TouchableOpacity
-                    style={styles.contribBtn}
-                    onPress={() => {
-                      setContribGoal(g);
-                      setContribAmount("");
-                    }}
-                  >
-                    <MaterialIcons name="add" size={16} color={gColor} />
-                    <Text style={[styles.contribBtnText, { color: gColor }]}>Para Ekle</Text>
+                <View style={s.goalBtns}>
+                  <TouchableOpacity style={s.depositBtn} onPress={() => openDeposit(g)}>
+                    <Text style={s.depositText}>+ Para Ekle</Text>
                   </TouchableOpacity>
-                )}
+                  <TouchableOpacity style={s.withdrawBtn} onPress={() => openWithdraw(g)}>
+                    <Text style={s.withdrawText}>Çıkar</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             );
           })}
         </View>
       )}
 
-      {/* Ekle / Düzenle */}
-      <Modal visible={modalOpen} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback onPress={() => setModalOpen(false)}>
-            <View style={StyleSheet.absoluteFill} />
-          </TouchableWithoutFeedback>
-          <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent}>
-            <Text style={styles.modalTitle}>{editing ? "Hedefi Düzenle" : "Yeni Hedef"}</Text>
-            <TextInput style={styles.input} placeholder="Hedef adı (örn. Tatil)" placeholderTextColor={COLORS.textMuted} value={title} onChangeText={setTitle} />
-            <View style={{ flexDirection: "row", gap: 12 }}>
-              <TextInput style={[styles.input, { flex: 1 }]} placeholder="Hedef ₺" placeholderTextColor={COLORS.textMuted} value={target} onChangeText={setTarget} keyboardType="numeric" />
-              <TextInput style={[styles.input, { flex: 1 }]} placeholder="Mevcut ₺" placeholderTextColor={COLORS.textMuted} value={current} onChangeText={setCurrent} keyboardType="numeric" />
+      {/* Add / Edit Modal */}
+      <Modal visible={modal === "add" || modal === "edit"} transparent animationType="fade">
+        <View style={s.overlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeModal} />
+          <View style={s.modalBox}>
+            <Text style={s.modalTitle}>{modal === "add" ? "Yeni Hedef" : "Hedefi Düzenle"}</Text>
+            <Text style={s.lbl}>Emoji</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {GOAL_EMOJIS.map(e => (
+                  <TouchableOpacity key={e} style={[s.emojiChip, emoji === e && s.emojiActive]} onPress={() => setEmoji(e)}>
+                    <Text style={{ fontSize: 22 }}>{e}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+            <Text style={s.lbl}>Hedef Adı</Text>
+            <TextInput style={s.input} value={title} onChangeText={setTitle} placeholder="Yaz Tatili, Yeni Araba..." placeholderTextColor={COLORS.textMuted} />
+            <Text style={s.lbl}>Hedef Tutar (₺)</Text>
+            <TextInput style={s.input} value={target} onChangeText={setTarget} placeholder="0.00" keyboardType="decimal-pad" placeholderTextColor={COLORS.textMuted} />
+            <Text style={s.lbl}>Mevcut Birikim (₺)</Text>
+            <TextInput style={s.input} value={current} onChangeText={setCurrent} placeholder="0.00" keyboardType="decimal-pad" placeholderTextColor={COLORS.textMuted} />
+            <Text style={s.lbl}>Son Tarih (isteğe bağlı)</Text>
+            <TextInput style={s.input} value={deadline} onChangeText={setDeadline} placeholder="2026-12-31" placeholderTextColor={COLORS.textMuted} />
+            <View style={s.btnRow}>
+              <TouchableOpacity style={s.cancelBtn} onPress={closeModal}><Text style={s.cancelText}>İptal</Text></TouchableOpacity>
+              <TouchableOpacity style={s.saveBtn} onPress={handleSave} disabled={busy}>
+                {busy ? <ActivityIndicator color="#000" size="small" /> : <Text style={s.saveText}>Kaydet</Text>}
+              </TouchableOpacity>
             </View>
-            <TextInput style={styles.input} placeholder="Son tarih (YYYY-AA-GG)" placeholderTextColor={COLORS.textMuted} value={deadline} onChangeText={setDeadline} />
-
-            <Text style={styles.fieldLabel}>İkon</Text>
-            <View style={styles.iconRow}>
-              {ICONS.map((ic) => (
-                <TouchableOpacity key={ic} onPress={() => setIcon(ic)} style={[styles.iconChoice, icon === ic && styles.iconChoiceActive]}>
-                  <MaterialIcons name={ic as any} size={20} color={icon === ic ? "#fff" : COLORS.textMuted} />
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.fieldLabel}>Renk</Text>
-            <View style={styles.colorRow}>
-              {COLOR_CHOICES.map((c) => (
-                <TouchableOpacity key={c} onPress={() => setColor(c)} style={[styles.colorDot, { backgroundColor: c }, color === c && styles.colorDotActive]} />
-              ))}
-            </View>
-
-            <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{editing ? "Güncelle" : "Kaydet"}</Text>}
-            </TouchableOpacity>
-          </ScrollView>
+          </View>
         </View>
       </Modal>
 
-      {/* Para ekleme */}
-      <Modal visible={!!contribGoal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback onPress={() => setContribGoal(null)}>
-            <View style={StyleSheet.absoluteFill} />
-          </TouchableWithoutFeedback>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Para Ekle · {contribGoal?.title}</Text>
-            <Text style={styles.hintText}>Eklemek için pozitif, çıkarmak için negatif tutar girin.</Text>
-            <TextInput style={styles.input} placeholder="Tutar ₺" placeholderTextColor={COLORS.textMuted} value={contribAmount} onChangeText={setContribAmount} keyboardType="numeric" autoFocus />
-            <TouchableOpacity style={styles.saveBtn} onPress={handleContribute}>
-              <Text style={styles.saveBtnText}>Uygula</Text>
-            </TouchableOpacity>
+      {/* Deposit / Withdraw Modal */}
+      <Modal visible={modal === "deposit" || modal === "withdraw"} transparent animationType="fade">
+        <View style={s.overlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeModal} />
+          <View style={s.modalBox}>
+            <Text style={s.modalTitle}>{modal === "deposit" ? "Para Ekle" : "Para Çıkar"}</Text>
+            <Text style={s.goalSubInfo}>{selectedGoal?.title}</Text>
+            <Text style={s.lbl}>Tutar (₺)</Text>
+            <TextInput style={s.input} value={txAmount} onChangeText={setTxAmount} placeholder="0.00" keyboardType="decimal-pad" autoFocus placeholderTextColor={COLORS.textMuted} />
+            <View style={s.btnRow}>
+              <TouchableOpacity style={s.cancelBtn} onPress={closeModal}><Text style={s.cancelText}>İptal</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.saveBtn, modal === "withdraw" && { backgroundColor: COLORS.expense }]} onPress={handleTransaction} disabled={busy}>
+                {busy ? <ActivityIndicator color="#000" size="small" /> : <Text style={s.saveText}>{modal === "deposit" ? "Ekle" : "Çıkar"}</Text>}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -261,54 +183,46 @@ export default function GoalsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollInside: { padding: 32 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 },
-  title: { fontSize: 28, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
-  subtitle: { fontSize: 13, color: COLORS.textMuted, marginTop: 4 },
-  addBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: COLORS.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
-  addBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
-
-  summaryCard: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.card, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.border, marginBottom: 24 },
-  netLabel: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1.2 },
-  netValue: { fontSize: 30, fontWeight: "900", color: COLORS.income, marginTop: 8, fontFamily: MONO },
-  netSub: { fontSize: 12, color: COLORS.textMuted, marginTop: 4 },
-  bigPercentBox: { width: 84, height: 84, borderRadius: 42, borderWidth: 4, borderColor: COLORS.primary, alignItems: "center", justifyContent: "center" },
-  bigPercent: { fontSize: 22, fontWeight: "900", color: "#fff" },
-
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
-  goalCard: { width: 280, backgroundColor: COLORS.card, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: COLORS.border },
-  goalTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
-  goalIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  goalActions: { flexDirection: "row", gap: 2 },
-  iconMini: { padding: 6 },
-  goalTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  goalAmounts: { fontSize: 14, marginTop: 6 },
-  track: { height: 8, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 4, overflow: "hidden", marginTop: 14 },
-  fill: { height: "100%", borderRadius: 4 },
-  goalFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 },
-  pctText: { fontSize: 12, fontWeight: "700" },
-  daysText: { fontSize: 11 },
-  contribBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 16, paddingVertical: 10, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: COLORS.border },
-  contribBtnText: { fontWeight: "700", fontSize: 13 },
-
-  emptyState: { alignItems: "center", justifyContent: "center", paddingVertical: 60 },
-  emptyText: { color: COLORS.textMuted, fontSize: 14, marginTop: 16 },
-
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center", padding: 20 },
-  modalScroll: { width: "100%", maxWidth: 460, maxHeight: "90%" },
-  modalContent: { width: "100%", maxWidth: 460, backgroundColor: COLORS.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: COLORS.border },
-  modalTitle: { fontSize: 20, fontWeight: "800", color: "#fff", marginBottom: 16 },
-  hintText: { color: COLORS.textMuted, fontSize: 12, marginBottom: 12 },
-  input: { backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 14, color: "#fff", fontSize: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
-  fieldLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: "700", marginTop: 4, marginBottom: 8 },
-  iconRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  iconChoice: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: COLORS.border },
-  iconChoiceActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  colorRow: { flexDirection: "row", gap: 12 },
-  colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "transparent" },
-  colorDotActive: { borderColor: "#fff" },
-  saveBtn: { backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 20 },
-  saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  scroll: { padding: 20 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  pageTitle: { color: "#fff", fontSize: 22, fontWeight: "800" },
+  addBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: COLORS.primary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  addBtnText: { color: "#000", fontWeight: "700", fontSize: 13 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  goalCard: { flex: 1, minWidth: 260, backgroundColor: COLORS.card, borderRadius: 14, padding: 18, borderWidth: 1, borderColor: COLORS.border, gap: 8 },
+  cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  goalIconWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.cardSecondary, alignItems: "center", justifyContent: "center" },
+  cardActions: { flexDirection: "row", gap: 4 },
+  iconBtn: { padding: 4 },
+  goalTitle: { color: COLORS.text, fontSize: 16, fontWeight: "800" },
+  goalDeadline: { color: COLORS.textMuted, fontSize: 11 },
+  goalCurrent: { color: COLORS.primary, fontSize: 22, fontWeight: "800", fontFamily: MONO },
+  goalPct: { color: COLORS.textMuted, fontSize: 12, fontWeight: "600", textAlign: "right" },
+  barTrack: { height: 6, backgroundColor: COLORS.track, borderRadius: 3, overflow: "hidden" },
+  barFill: { height: "100%", borderRadius: 3, backgroundColor: COLORS.primary },
+  goalBtns: { flexDirection: "row", gap: 10, marginTop: 4 },
+  depositBtn: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 8, backgroundColor: COLORS.primary },
+  depositText: { color: "#000", fontWeight: "800", fontSize: 13 },
+  withdrawBtn: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.cardSecondary },
+  withdrawText: { color: COLORS.textSecondary, fontWeight: "700", fontSize: 13 },
+  emptyWrap: { alignItems: "center", paddingVertical: 48, gap: 12 },
+  emptyIcon: { fontSize: 40 },
+  emptyText: { color: COLORS.textMuted, fontSize: 14 },
+  emptyBtn: { backgroundColor: COLORS.primary, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
+  emptyBtnText: { color: "#000", fontWeight: "700", fontSize: 13 },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 20 },
+  modalBox: { width: "100%", maxWidth: 420, backgroundColor: "#1a1f2e", borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.border },
+  modalTitle: { color: "#fff", fontSize: 18, fontWeight: "800", marginBottom: 4 },
+  goalSubInfo: { color: COLORS.textMuted, fontSize: 13, marginBottom: 16 },
+  lbl: { color: COLORS.textMuted, fontSize: 11, fontWeight: "700", marginBottom: 8 },
+  input: { backgroundColor: COLORS.cardSecondary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, color: "#fff", fontSize: 14, borderWidth: 1, borderColor: COLORS.border, marginBottom: 14 },
+  emojiChip: { width: 48, height: 48, borderRadius: 10, backgroundColor: COLORS.cardSecondary, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: COLORS.border },
+  emojiActive: { borderColor: COLORS.primary, backgroundColor: "rgba(0,201,167,0.15)" },
+  btnRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+  cancelBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 10, backgroundColor: COLORS.cardSecondary, borderWidth: 1, borderColor: COLORS.border },
+  cancelText: { color: COLORS.textSecondary, fontWeight: "700" },
+  saveBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 10, backgroundColor: COLORS.primary },
+  saveText: { color: "#000", fontWeight: "800" },
 });
