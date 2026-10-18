@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -13,7 +13,7 @@ import {
   BricolageGrotesque_600SemiBold,
   BricolageGrotesque_700Bold,
 } from "@expo-google-fonts/bricolage-grotesque";
-import { SessionProvider, useSession } from "@/context/SessionContext";
+import { SessionProvider, useSession, type SessionStatus } from "@/context/SessionContext";
 import { colors } from "@/theme";
 
 function Loading() {
@@ -25,8 +25,13 @@ function Loading() {
 }
 
 function RootNavigator() {
-  const { status } = useSession();
-  if (status === "loading") return <Loading />;
+  const { status: liveStatus } = useSession();
+  // İlk açılıştan sonraki kısa "yükleniyor" anlarında ekranı sökme;
+  // son bilinen durumda kal. Böylece açık ekranlardaki hata mesajları kaybolmaz.
+  const lastSettled = useRef<Exclude<SessionStatus, "loading"> | null>(null);
+  if (liveStatus !== "loading") lastSettled.current = liveStatus;
+  const status = liveStatus === "loading" ? lastSettled.current : liveStatus;
+  if (status === null) return <Loading />;
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>

@@ -42,7 +42,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     return onSnapshot(
       doc(db, "users", user.uid),
+      { includeMetadataChanges: true },
       (snap) => {
+        // Yazma işlemi henüz sunucuya ulaşmadıysa bekle. Aksi halde hane,
+        // sunucuda oluşmadan okunmaya çalışılır ve güvenlik kuralı reddeder.
+        if (snap.metadata.hasPendingWrites) return;
         setProfile(snap.exists() ? ({ uid: user.uid, ...snap.data() } as UserProfile) : null);
         setProfileReady(true);
       },
@@ -63,19 +67,39 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setHouseholdReady(true);
       return;
     }
-    return onSnapshot(
-      doc(db, "households", householdId),
-      (snap) => {
-        setHousehold(snap.exists() ? ({ id: snap.id, ...snap.data() } as Household) : null);
-        setHouseholdReady(true);
-      },
-      (err) => {
-        // Örn. hane silindiyse ya da kullanıcı üyelikten çıkarıldıysa.
-        console.warn("Hane okunamadı", err);
-        setHousehold(null);
-        setHouseholdReady(true);
-      },
-    );
+
+    let unsubscribe: (() => void) | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    const listen = (attempt: number) => {
+      unsubscribe = onSnapshot(
+        doc(db, "households", householdId),
+        (snap) => {
+          setHousehold(snap.exists() ? ({ id: snap.id, ...snap.data() } as Household) : null);
+          setHouseholdReady(true);
+        },
+        (err) => {
+          // Hata alan dinleyici kendini kapatır. Yeni kurulan/katılınan hanede
+          // sunucu bir anlık geride kalabilir; birkaç kez tekrar dene.
+          if (!cancelled && attempt < 3) {
+            retryTimer = setTimeout(() => listen(attempt + 1), 800 * (attempt + 1));
+            return;
+          }
+          // Örn. hane silindiyse ya da kullanıcı üyelikten çıkarıldıysa.
+          console.warn("Hane okunamadı", err);
+          setHousehold(null);
+          setHouseholdReady(true);
+        },
+      );
+    };
+    listen(0);
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      unsubscribe?.();
+    };
   }, [householdId]);
 
   const status: SessionStatus = useMemo(() => {
