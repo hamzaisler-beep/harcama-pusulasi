@@ -5,26 +5,14 @@ import {
   doc,
   getDoc,
   serverTimestamp,
+  updateDoc,
   writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Invite } from "../types";
+import { INVITE_CODE_LENGTH, normalizeCode, randomCode } from "./inviteCode";
 
-// Karışabilecek karakterler (0/O, 1/I/L) yok.
-const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-export const INVITE_CODE_LENGTH = 6;
-
-function randomCode(): string {
-  let code = "";
-  for (let i = 0; i < INVITE_CODE_LENGTH; i++) {
-    code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
-  }
-  return code;
-}
-
-export function normalizeCode(input: string): string {
-  return input.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-}
+export { INVITE_CODE_LENGTH, normalizeCode } from "./inviteCode";
 
 export function displayNameOf(user: User): string {
   return user.displayName?.trim() || user.email?.split("@")[0] || "Üye";
@@ -88,4 +76,12 @@ export async function joinHousehold(user: User, rawCode: string): Promise<string
 
   await batch.commit();
   return householdId;
+}
+
+/** Hane adını değiştirir (her üye yapabilir). */
+export async function renameHousehold(householdId: string, name: string): Promise<void> {
+  const clean = name.trim();
+  if (!clean) throw new Error("Hane adı boş olamaz.");
+  if (clean.length > 40) throw new Error("Hane adı en fazla 40 karakter olabilir.");
+  await updateDoc(doc(db, "households", householdId), { name: clean });
 }

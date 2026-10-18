@@ -23,6 +23,28 @@ export interface Household {
   createdAt?: Timestamp;
 }
 
+export type TransactionType = "expense" | "income";
+
+/** 4. aşamada gerçek hesaplara (accounts) bağlanacak; şimdilik basit seçim. */
+export type PaymentMethod = "kart" | "nakit" | "hesap";
+
+/** households/{hid}/transactions/{id} */
+export interface Transaction {
+  id: string;
+  type: TransactionType;
+  /** Kuruş cinsinden, her zaman pozitif tam sayı (12,50 ₺ → 1250). */
+  amountKurus: number;
+  categoryId: string;
+  /** İşlemin günü (saat önemli değil). */
+  date: Timestamp;
+  note: string;
+  paymentMethod: PaymentMethod;
+  createdBy: string;
+  source: "manual" | "statement";
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
 /** invites/{code} */
 export interface Invite {
   householdId: string;

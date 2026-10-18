@@ -1,6 +1,6 @@
-import React, { useRef } from "react";
-import { ActivityIndicator, View } from "react-native";
-import { Stack } from "expo-router";
+import React, { useEffect, useRef } from "react";
+import { ActivityIndicator, Platform, View } from "react-native";
+import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useFonts } from "expo-font";
@@ -31,6 +31,23 @@ function RootNavigator() {
   const lastSettled = useRef<Exclude<SessionStatus, "loading"> | null>(null);
   if (liveStatus !== "loading") lastSettled.current = liveStatus;
   const status = liveStatus === "loading" ? lastSettled.current : liveStatus;
+
+  // Web'de sayfa /islemler gibi bir adreste yenilenirse, oturum yüklenene kadar
+  // adres kaybolup Ana Sayfa'ya düşülüyordu. İlk adresi saklayıp geri dön.
+  const initialPath = useRef<string | null>(
+    Platform.OS === "web" && typeof window !== "undefined"
+      ? window.location.pathname + window.location.search
+      : null,
+  );
+  useEffect(() => {
+    if (status !== "ready" || !initialPath.current) return;
+    const target = initialPath.current;
+    initialPath.current = null;
+    if (target !== "/" && !target.startsWith("/giris") && !target.startsWith("/hane")) {
+      router.replace(target as never);
+    }
+  }, [status]);
+
   if (status === null) return <Loading />;
 
   return (
@@ -44,6 +61,7 @@ function RootNavigator() {
       <Stack.Protected guard={status === "ready"}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="ayarlar" />
+        <Stack.Screen name="islem/[id]" />
       </Stack.Protected>
     </Stack>
   );

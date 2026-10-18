@@ -54,10 +54,13 @@ export function Screen({
   children,
   scroll = true,
   contentStyle,
+  testID,
 }: {
   children: React.ReactNode;
   scroll?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  /** Otomatik testlerin bu ekranı bulması için */
+  testID?: string;
 }) {
   const inner = scroll ? (
     <ScrollView
@@ -72,7 +75,9 @@ export function Screen({
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View style={styles.maxWidth}>{inner}</View>
+        <View style={styles.maxWidth} testID={testID}>
+          {inner}
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

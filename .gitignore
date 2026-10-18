@@ -7,3 +7,5 @@ web-build/
 *.log
 .DS_Store
 .vercel
+dist-e2e/
+e2e/shots/
