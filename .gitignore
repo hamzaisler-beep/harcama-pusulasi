@@ -9,3 +9,4 @@ web-build/
 .vercel
 dist-e2e/
 e2e/shots/
+__pycache__/

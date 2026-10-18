@@ -42,5 +42,13 @@ export const space = {
   xxl: 28,
 } as const;
 
-// Hane üyelerine sırayla verilen avatar renkleri.
-export const memberColors = [colors.accent, colors.warn, "#2F5A8A", "#6B4E9B"] as const;
+// Hane üyelerine sırayla verilen renkler (avatar ve grafikler).
+// Renk körlüğü dahil ayırt edilebilirliği doğrulanmış sıra; sırayı değiştirme.
+export const memberColors = ["#2A78D6", "#EB6834", "#1BAF7A", "#6250D6"] as const;
+
+// Bütçe durum renkleri (her zaman yazıyla birlikte kullanılır, tek başına değil).
+export const statusColors = {
+  ok: colors.accent,
+  warn: "#D9772F",
+  over: "#9A3A0B",
+} as const;

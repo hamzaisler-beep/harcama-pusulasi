@@ -6,7 +6,11 @@ import { InviteCard } from "@/components/InviteCard";
 import { MonthSwitcher, PersonFilter, startOfMonth } from "@/components/filters";
 import { TransactionRow } from "@/components/TransactionRow";
 import { useReadySession } from "@/context/SessionContext";
-import { useMonthTransactions, useTotals } from "@/hooks/useMonthTransactions";
+import { toLite, useMonthTransactions, useTotals } from "@/hooks/useMonthTransactions";
+import { useBudgetLimits } from "@/lib/budget";
+import { summarizeBudget } from "@/lib/budgetMath";
+import { getCategory } from "@/lib/categories";
+import { BudgetStatusText } from "@/components/budget";
 import { formatKurus } from "@/lib/format";
 import { colors, fonts, memberColors, radius } from "@/theme";
 
@@ -23,6 +27,13 @@ export default function AnaSayfa() {
     [transactions, person],
   );
   const { income, expense, balance } = useTotals(visible);
+
+  // Bütçe uyarıları her zaman hanenin tamamına göre (kişi filtresinden bağımsız).
+  const { limits } = useBudgetLimits(household.id);
+  const alerts = useMemo(
+    () => summarizeBudget(toLite(transactions), limits).categories.filter((c) => c.state !== "ok"),
+    [transactions, limits],
+  );
 
   const members = household.members.map((uid, i) => ({
     uid,
@@ -70,6 +81,24 @@ export default function AnaSayfa() {
           </View>
         </View>
       </View>
+
+      {alerts.length > 0 && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Bütçe uyarıları, bütçeye git"
+          onPress={() => router.navigate("/butce")}
+        >
+          <Card style={{ gap: 8, borderWidth: 1.5, borderColor: "#F0CDB6" }}>
+            <AppText variant="bodyStrong">Bütçe uyarısı</AppText>
+            {alerts.slice(0, 3).map((a) => (
+              <View key={a.categoryId} style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+                <AppText style={{ fontSize: 14 }}>{getCategory(a.categoryId).name}</AppText>
+                <BudgetStatusText state={a.state} spent={a.spent} limit={a.limit} />
+              </View>
+            ))}
+          </Card>
+        </Pressable>
+      )}
 
       <PersonFilter household={household} myUid={user.uid} value={person} onChange={setPerson} />
 

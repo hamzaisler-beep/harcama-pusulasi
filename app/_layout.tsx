@@ -62,6 +62,7 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="ayarlar" />
         <Stack.Screen name="islem/[id]" />
+        <Stack.Screen name="butce-duzenle" />
       </Stack.Protected>
     </Stack>
   );
