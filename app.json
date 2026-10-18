@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Harcama Pusulası",
+    "slug": "HarcamaPusulasi",
+    "version": "3.0.0",
+    "orientation": "portrait",
+    "scheme": "harcamapusulasi",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F3F5F4",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0E3B33"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.harcamapusulasi.app"
+    },
+    "android": {
+      "package": "com.harcamapusulasi.app",
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0E3B33"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": ["expo-router", "expo-font"],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
