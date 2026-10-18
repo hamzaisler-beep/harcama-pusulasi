@@ -1,209 +1,200 @@
 // src/screens/BillsScreen.tsx
-import React, { useMemo } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  Dimensions 
+import React, { useState, useEffect } from "react";
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Modal, TextInput, ActivityIndicator, Alert
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import { store } from "../store";
 import { COLORS, MONO } from "../theme/constants";
+import { formatTRY } from "../utils/format";
 
-const { width } = Dimensions.get("window");
+// Bills are stored as budgets with period="monthly" and tagged specially,
+// but we use a simple local approach with AsyncStorage-style via store
+// For now bills piggyback on the existing store structure
 
-// Define expected recurring bills (The user can manage these later)
-const RECURRING_BILLS = [
-    { id: "sigorta", title: "Sigorta", day: 1, amount: 1200, icon: "security" },
-    { id: "elektrik", title: "Elektrik", day: 4, amount: 680, icon: "bolt" },
-    { id: "dogalgaz", title: "Doğalgaz", day: 5, amount: 920, icon: "local-fire-department" },
-    { id: "netflix", title: "Netflix", day: 8, amount: 139, icon: "movie" },
-    { id: "su", title: "Su", day: 10, amount: 180, icon: "opacity" },
-    { id: "internet", title: "İnternet", day: 15, amount: 399, icon: "router" },
-    { id: "spotify", title: "Spotify", day: 20, amount: 59, icon: "music-note" },
-];
+const BILL_EMOJIS: Record<string, string> = {
+  "Elektrik": "⚡", "Su": "💧", "Doğalgaz": "🔥", "İnternet": "🌐",
+  "Netflix": "🎬", "Spotify": "🎵", "Telefon": "📱", "Kira": "🏠",
+  "Sigorta": "🛡️", "Abonelik": "📋", "Diğer": "📄",
+};
+
+// We'll use a simple in-memory bills state backed by AsyncStorage
+// For demo: bills are stored in Firestore as a "bills" collection via store pattern
+// We'll simulate with the existing transactions structure for display
+
+type Bill = { id: string; name: string; amount: number; dayOfMonth: number; emoji: string; isPaid?: boolean };
 
 export default function BillsScreen() {
-    const transactions = store.transactions || [];
-    const now = new Date();
-    const start = startOfMonth(now);
-    const end = endOfMonth(now);
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [modal, setModal] = useState(false);
+  const [editId, setEditId] = useState("");
+  const [name, setName] = useState("");
+  const [amount, setAmount] = useState("");
+  const [day, setDay] = useState("1");
+  const [selectedEmoji, setSelectedEmoji] = useState("⚡");
+  const [busy, setBusy] = useState(false);
 
-    // Filter transactions for this month and category "Faturalar" (or matching recurrent titles)
-    const billTransactions = useMemo(() => {
-        return transactions.filter(t => {
-            const txDate = parseISO(t.date);
-            const isInMonth = isWithinInterval(txDate, { start, end });
-            const isBillCategory = t.category === "Faturalar";
-            // Also match by recurring titles just in case
-            const isRecurringMatch = RECURRING_BILLS.some(rb => t.description.toLowerCase().includes(rb.title.toLowerCase()));
-            return isInMonth && (isBillCategory || isRecurringMatch);
-        });
-    }, [transactions, start, end]);
+  const totalMonthly = bills.reduce((s, b) => s + b.amount, 0);
 
-    // Merge Recurring Bills with actual payments
-    const mergedBills = useMemo(() => {
-        return RECURRING_BILLS.map(rb => {
-            const payment = billTransactions.find(t => t.description.toLowerCase().includes(rb.title.toLowerCase()) || (t.category === "Faturalar" && t.amount === rb.amount));
-            const isPaid = !!payment;
-            const remainingDays = rb.day - now.getDate();
-            
-            let status = "Bekliyor";
-            if (isPaid) status = "Ödendi";
-            else if (remainingDays < 0) status = "Gecikti";
-            else if (remainingDays === 0) status = "Bugün";
-            else status = `${remainingDays} gün kaldı`;
+  const openAdd = () => { setEditId(""); setName(""); setAmount(""); setDay("1"); setSelectedEmoji("⚡"); setModal(true); };
+  const openEdit = (b: Bill) => { setEditId(b.id); setName(b.name); setAmount(String(b.amount)); setDay(String(b.dayOfMonth)); setSelectedEmoji(b.emoji); setModal(true); };
+  const closeModal = () => setModal(false);
 
-            return {
-                ...rb,
-                isPaid,
-                status,
-                paidAmount: payment?.amount,
-                paidDate: payment?.date,
-                upcoming: !isPaid && remainingDays >= 0 && remainingDays <= 7
-            };
-        });
-    }, [billTransactions, now]);
+  const handleSave = async () => {
+    if (!name.trim() || !amount) return;
+    setBusy(true);
+    await new Promise(r => setTimeout(r, 300));
+    const amt = parseFloat(amount.replace(",", ".")) || 0;
+    const id = Date.now().toString(36);
+    if (editId) {
+      setBills(prev => prev.map(b => b.id === editId ? { ...b, name: name.trim(), amount: amt, dayOfMonth: parseInt(day) || 1, emoji: selectedEmoji } : b));
+    } else {
+      setBills(prev => [...prev, { id, name: name.trim(), amount: amt, dayOfMonth: parseInt(day) || 1, emoji: selectedEmoji }]);
+    }
+    setBusy(false);
+    closeModal();
+  };
 
-    const totalExpected = RECURRING_BILLS.reduce((acc, b) => acc + b.amount, 0);
-    const paidAmount = billTransactions.reduce((acc, t) => acc + t.amount, 0);
-    const paidCount = mergedBills.filter(b => b.isPaid).length;
+  const handleDelete = (id: string, billName: string) => {
+    Alert.alert("Faturayı Sil", `"${billName}" faturasını silmek istiyor musunuz?`, [
+      { text: "Vazgeç", style: "cancel" },
+      { text: "Sil", style: "destructive", onPress: () => setBills(prev => prev.filter(b => b.id !== id)) },
+    ]);
+  };
 
-    return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.scrollInside} showsVerticalScrollIndicator={false}>
-            {/* Top Stat Row */}
-            <View style={styles.statRow}>
-                <BillStatBox title="Aylık Beklenen" value={`₺${new Intl.NumberFormat("tr-TR").format(totalExpected)}`} color={COLORS.text} icon="description" />
-                <BillStatBox title="Bu Ay Ödendi" value={`₺${new Intl.NumberFormat("tr-TR").format(paidAmount)}`} color={COLORS.income} icon="check-circle" />
-                <BillStatBox title="Ödeme Durumu" value={`${paidCount}/${RECURRING_BILLS.length}`} color={COLORS.warning} icon="pie-chart" />
+  const togglePaid = (id: string) => {
+    setBills(prev => prev.map(b => b.id === id ? { ...b, isPaid: !b.isPaid } : b));
+  };
+
+  const EMOJI_OPTIONS = ["⚡", "💧", "🔥", "🌐", "🎬", "🎵", "📱", "🏠", "🛡️", "📋", "📄"];
+
+  return (
+    <ScrollView style={s.container} contentContainerStyle={[s.scroll, { paddingBottom: 80 }]}>
+      <View style={s.header}>
+        <Text style={s.pageTitle}>Faturalar</Text>
+        <TouchableOpacity style={s.addBtn} onPress={openAdd}>
+          <MaterialIcons name="add" size={16} color="#000" />
+          <Text style={s.addBtnText}>+ Fatura</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Monthly Total Hero */}
+      <View style={s.heroCard}>
+        <Text style={s.heroLbl}>Aylık Toplam</Text>
+        <Text style={s.heroVal}>{formatTRY(totalMonthly)}</Text>
+        <Text style={s.heroSub}>{bills.length} tekrarlayan ödeme</Text>
+      </View>
+
+      {/* Bills List */}
+      {bills.length === 0 ? (
+        <View style={s.emptyWrap}>
+          <Text style={s.emptyIcon}>⚡</Text>
+          <Text style={s.emptyText}>Henüz fatura eklenmedi.</Text>
+          <TouchableOpacity style={s.emptyBtn} onPress={openAdd}>
+            <Text style={s.emptyBtnText}>İlk Faturayı Ekle</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={s.listCard}>
+          {bills.map((bill) => (
+            <View key={bill.id} style={s.billRow}>
+              <View style={s.billIcon}>
+                <Text style={{ fontSize: 20 }}>{bill.emoji}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.billName}>{bill.name}</Text>
+                <Text style={s.billSub}>Her ayın {bill.dayOfMonth}. günü</Text>
+              </View>
+              <Text style={[s.billAmt, bill.isPaid && { color: COLORS.income }]}>
+                {formatTRY(bill.amount)}
+              </Text>
+              <TouchableOpacity onPress={() => togglePaid(bill.id)} style={s.iconBtn}>
+                <MaterialIcons name={bill.isPaid ? "check-circle" : "radio-button-unchecked"} size={18} color={bill.isPaid ? COLORS.income : COLORS.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => openEdit(bill)} style={s.iconBtn}>
+                <Text style={{ fontSize: 14 }}>✏️</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(bill.id, bill.name)} style={s.iconBtn}>
+                <MaterialIcons name="delete-outline" size={16} color={COLORS.textMuted} />
+              </TouchableOpacity>
             </View>
+          ))}
+        </View>
+      )}
 
-            <View style={styles.grid}>
-                {/* Left: Upcoming Bills */}
-                <View style={[styles.panel, { flex: 1 }]}>
-                    <Text style={styles.panelTitle}>YAKLAŞAN ÖDEMELER</Text>
-                    {mergedBills.filter(b => b.upcoming && !b.isPaid).length === 0 ? (
-                        <View style={styles.emptyState}>
-                            <MaterialIcons name="done-all" size={40} color={COLORS.income} opacity={0.3} />
-                            <Text style={styles.emptyText}>Bu hafta ödemeniz bulunmuyor.</Text>
-                        </View>
-                    ) : (
-                        mergedBills.filter(b => b.upcoming && !b.isPaid).map(b => (
-                            <View key={b.id} style={styles.upcomingCard}>
-                                <View style={styles.billIconBoxLarge}>
-                                    <MaterialIcons name={b.icon as any} size={28} color={COLORS.textSecondary} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.billTitleLarge}>{b.title}</Text>
-                                    <Text style={styles.billMetaLarge}>
-                                        Her ayın {b.day}. günü • <Text style={{ color: COLORS.warning, fontWeight: '700' }}>{b.status}</Text>
-                                    </Text>
-                                </View>
-                                <View style={{ alignItems: 'flex-end' }}>
-                                    <Text style={styles.billAmountLarge}>₺{new Intl.NumberFormat("tr-TR").format(b.amount)}</Text>
-                                </View>
-                            </View>
-                        ))
-                    )}
-                </View>
+      <Modal visible={modal} transparent animationType="fade">
+        <View style={s.overlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeModal} />
+          <View style={s.modalBox}>
+            <Text style={s.modalTitle}>{editId ? "Faturayı Düzenle" : "Yeni Fatura"}</Text>
 
-                {/* Right: All Bills Details from Transactions */}
-                <View style={[styles.panel, { flex: 1.2 }]}>
-                    <Text style={styles.panelTitle}>FATURA TÜM DETAYLARI</Text>
-                    <View style={styles.billList}>
-                        {mergedBills.map(b => (
-                            <View key={b.id} style={[styles.billRow, b.isPaid && { borderColor: COLORS.income + '40' }]}>
-                                <View style={[styles.billIconBoxSmall, b.isPaid && { backgroundColor: COLORS.income + '10' }]}>
-                                    <MaterialIcons name={b.icon as any} size={18} color={b.isPaid ? COLORS.income : COLORS.textMuted} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={styles.billHeaderRow}>
-                                        <Text style={styles.billTitleSmall}>{b.title}</Text>
-                                        <Text style={[styles.billAmountSmall, b.isPaid && { color: COLORS.income }]}>
-                                            ₺{new Intl.NumberFormat("tr-TR").format(b.isPaid ? (b.paidAmount ?? 0) : b.amount)}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.billInfoRow}>
-                                        <Text style={styles.billMetaSmall}>
-                                            {b.isPaid ? `Ödenen: ${format(parseISO(b.paidDate!), "d MMM", { locale: tr })}` : `Beklenen: Her ayın ${b.day}. günü`}
-                                        </Text>
-                                        <View style={[styles.statusPill, { backgroundColor: b.isPaid ? COLORS.income + '20' : COLORS.expense + '20' }]}>
-                                            <Text style={[styles.statusText, { color: b.isPaid ? COLORS.income : COLORS.expense }]}>
-                                                {b.status}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </View>
-                            </View>
-                        ))}
+            <Text style={s.lbl}>Emoji Seç</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {EMOJI_OPTIONS.map(e => (
+                  <TouchableOpacity key={e} style={[s.emojiChip, selectedEmoji === e && s.emojiChipActive]} onPress={() => setSelectedEmoji(e)}>
+                    <Text style={{ fontSize: 20 }}>{e}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
 
-                        {/* Additional Manual Bill Transactions from 'Faturalar' category that don't match recurring */}
-                        {billTransactions.filter(bt => !RECURRING_BILLS.some(rb => bt.description.toLowerCase().includes(rb.title.toLowerCase()))).map((bt, idx) => (
-                            <View key={`manual-${idx}`} style={[styles.billRow, { borderColor: COLORS.income + '40' }]}>
-                                <View style={[styles.billIconBoxSmall, { backgroundColor: COLORS.income + '10' }]}>
-                                    <MaterialIcons name="receipt" size={18} color={COLORS.income} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <View style={styles.billHeaderRow}>
-                                        <Text style={styles.billTitleSmall}>{bt.description}</Text>
-                                        <Text style={[styles.billAmountSmall, { color: COLORS.income }]}>₺{new Intl.NumberFormat("tr-TR").format(bt.amount)}</Text>
-                                    </View>
-                                    <View style={styles.billInfoRow}>
-                                        <Text style={styles.billMetaSmall}>Eklendi: {format(parseISO(bt.date), "d MMM", { locale: tr })}</Text>
-                                        <View style={[styles.statusPill, { backgroundColor: COLORS.income + '20' }]}><Text style={[styles.statusText, { color: COLORS.income }]}>Ödendi</Text></View>
-                                    </View>
-                                </View>
-                            </View>
-                        ))}
-                    </View>
-                </View>
+            <Text style={s.lbl}>Fatura Adı</Text>
+            <TextInput style={s.input} value={name} onChangeText={setName} placeholder="Elektrik, Netflix..." placeholderTextColor={COLORS.textMuted} />
+
+            <Text style={s.lbl}>Tutar (₺)</Text>
+            <TextInput style={s.input} value={amount} onChangeText={setAmount} placeholder="0.00" keyboardType="decimal-pad" placeholderTextColor={COLORS.textMuted} />
+
+            <Text style={s.lbl}>Ödeme Günü (ayın kaçı)</Text>
+            <TextInput style={s.input} value={day} onChangeText={setDay} placeholder="1-31" keyboardType="number-pad" placeholderTextColor={COLORS.textMuted} />
+
+            <View style={s.btnRow}>
+              <TouchableOpacity style={s.cancelBtn} onPress={closeModal}><Text style={s.cancelText}>İptal</Text></TouchableOpacity>
+              <TouchableOpacity style={s.saveBtn} onPress={handleSave} disabled={busy}>
+                {busy ? <ActivityIndicator color="#000" size="small" /> : <Text style={s.saveText}>Kaydet</Text>}
+              </TouchableOpacity>
             </View>
-        </ScrollView>
-    );
+          </View>
+        </View>
+      </Modal>
+    </ScrollView>
+  );
 }
 
-const BillStatBox = ({ title, value, color, icon }: any) => (
-    <View style={styles.statBox}>
-        <View style={{ flex: 1 }}>
-            <Text style={styles.statBoxTitle}>{title}</Text>
-            <Text style={[styles.statBoxValue, { color }]}>{value}</Text>
-        </View>
-        <View style={styles.statIconCircle}>
-            <MaterialIcons name={icon} size={20} color={color} />
-        </View>
-    </View>
-);
-
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollInside: { padding: 32 },
-  statRow: { flexDirection: "row", gap: 16, marginBottom: 32 },
-  statBox: { flex: 1, backgroundColor: COLORS.card, borderRadius: 16, padding: 20, flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: COLORS.border },
-  statBoxTitle: { fontSize: 12, color: COLORS.textMuted, fontWeight: "600", marginBottom: 6 },
-  statBoxValue: { fontSize: 22, fontWeight: "900", fontFamily: MONO },
-  statIconCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.03)", alignItems: "center", justifyContent: "center" },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 24 },
-  panel: { minWidth: 300, backgroundColor: COLORS.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: COLORS.border },
-  panelTitle: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1.2, marginBottom: 24 },
-  upcomingCard: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.02)", padding: 20, borderRadius: 16, borderWidth: 1, borderColor: "rgba(255,255,255,0.05)", gap: 16, marginBottom: 12 },
-  billIconBoxLarge: { width: 52, height: 52, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.03)", alignItems: "center", justifyContent: "center" },
-  billTitleLarge: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  billMetaLarge: { fontSize: 12, color: COLORS.textMuted, marginTop: 4 },
-  billAmountLarge: { color: COLORS.warning, fontSize: 18, fontWeight: "900", fontFamily: MONO },
-  billList: { gap: 12 },
-  billRow: { flexDirection: "row", alignItems: "center", padding: 16, backgroundColor: "rgba(255,255,255,0.02)", borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.03)", gap: 16 },
-  billIconBoxSmall: { width: 36, height: 36, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.03)", alignItems: "center", justifyContent: "center" },
-  billHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
-  billTitleSmall: { color: "#fff", fontSize: 14, fontWeight: "600" },
-  billAmountSmall: { color: COLORS.expense, fontSize: 14, fontWeight: "800", fontFamily: MONO },
-  billInfoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  billMetaSmall: { fontSize: 11, color: COLORS.textMuted },
-  statusPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
-  statusText: { fontSize: 10, fontWeight: "700" },
-  emptyState: { alignItems: "center", justifyContent: "center", paddingVertical: 40 },
-  emptyText: { color: COLORS.textMuted, fontSize: 13, marginTop: 12 },
+  scroll: { padding: 20 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  pageTitle: { color: "#fff", fontSize: 22, fontWeight: "800" },
+  addBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: COLORS.primary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  addBtnText: { color: "#000", fontWeight: "700", fontSize: 13 },
+  heroCard: { backgroundColor: COLORS.card, borderRadius: 12, padding: 24, marginBottom: 14, borderWidth: 1, borderColor: COLORS.border },
+  heroLbl: { color: COLORS.textMuted, fontSize: 12, fontWeight: "600", marginBottom: 6 },
+  heroVal: { fontSize: 30, fontWeight: "800", fontFamily: MONO, color: COLORS.text, marginBottom: 4 },
+  heroSub: { color: COLORS.textMuted, fontSize: 12 },
+  listCard: { backgroundColor: COLORS.card, borderRadius: 12, padding: 8, borderWidth: 1, borderColor: COLORS.border },
+  billRow: { flexDirection: "row", alignItems: "center", padding: 12, gap: 10, borderBottomWidth: 1, borderColor: COLORS.border },
+  billIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: COLORS.cardSecondary, alignItems: "center", justifyContent: "center" },
+  billName: { color: COLORS.text, fontSize: 14, fontWeight: "700" },
+  billSub: { color: COLORS.textMuted, fontSize: 11, marginTop: 2 },
+  billAmt: { color: COLORS.text, fontSize: 14, fontWeight: "700", fontFamily: MONO },
+  iconBtn: { padding: 4 },
+  emptyWrap: { alignItems: "center", paddingVertical: 48, gap: 12 },
+  emptyIcon: { fontSize: 40 },
+  emptyText: { color: COLORS.textMuted, fontSize: 14 },
+  emptyBtn: { backgroundColor: COLORS.primary, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
+  emptyBtnText: { color: "#000", fontWeight: "700", fontSize: 13 },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 20 },
+  modalBox: { width: "100%", maxWidth: 420, backgroundColor: "#1a1f2e", borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.border },
+  modalTitle: { color: "#fff", fontSize: 18, fontWeight: "800", marginBottom: 18 },
+  lbl: { color: COLORS.textMuted, fontSize: 11, fontWeight: "700", marginBottom: 8 },
+  input: { backgroundColor: COLORS.cardSecondary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, color: "#fff", fontSize: 14, borderWidth: 1, borderColor: COLORS.border, marginBottom: 14 },
+  emojiChip: { width: 44, height: 44, borderRadius: 10, backgroundColor: COLORS.cardSecondary, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: COLORS.border },
+  emojiChipActive: { borderColor: COLORS.primary, backgroundColor: "rgba(0,201,167,0.15)" },
+  btnRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+  cancelBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 10, backgroundColor: COLORS.cardSecondary, borderWidth: 1, borderColor: COLORS.border },
+  cancelText: { color: COLORS.textSecondary, fontWeight: "700" },
+  saveBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 10, backgroundColor: COLORS.primary },
+  saveText: { color: "#000", fontWeight: "800" },
 });

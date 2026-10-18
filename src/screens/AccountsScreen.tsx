@@ -1,178 +1,111 @@
 // src/screens/AccountsScreen.tsx
-import React, { useMemo, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Modal,
-  Platform,
-  TouchableWithoutFeedback,
-  ActivityIndicator,
-  Alert,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Modal, TextInput, ActivityIndicator, Alert, Platform
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { store } from "../store";
-import { useStore } from "../hooks/useStore";
 import { COLORS, MONO, Account } from "../theme/constants";
 import { formatTRY } from "../utils/format";
 
-type AccType = "CASH" | "BANK" | "CARD";
-
-const ACCOUNT_TYPES: { key: AccType; label: string; icon: any }[] = [
-  { key: "CASH", label: "Nakit", icon: "payments" },
-  { key: "BANK", label: "Banka", icon: "account-balance" },
-  { key: "CARD", label: "Kredi Kartı", icon: "credit-card" },
+const ACCOUNT_TYPES = [
+  { value: "BANK", label: "Banka", icon: "account-balance", emoji: "🏦" },
+  { value: "CASH", label: "Nakit", icon: "payments", emoji: "💵" },
+  { value: "CARD", label: "Kredi Kartı", icon: "credit-card", emoji: "💳" },
 ];
-
-const COLOR_CHOICES = [
-  COLORS.primary,
-  COLORS.income,
-  COLORS.info,
-  COLORS.warning,
-  COLORS.accent2,
-  COLORS.expense,
-];
-
-const confirmDelete = (msg: string, onYes: () => void) => {
-  if (Platform.OS === "web") {
-    if (window.confirm(msg)) onYes();
-  } else {
-    Alert.alert("Sil", msg, [
-      { text: "Vazgeç", style: "cancel" },
-      { text: "Sil", style: "destructive", onPress: onYes },
-    ]);
-  }
-};
 
 export default function AccountsScreen() {
-  const s = useStore();
-  const accounts = s.accounts;
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Account | null>(null);
+  const [tick, setTick] = useState(0);
+  const [modal, setModal] = useState<"add" | "edit" | null>(null);
+  const [editId, setEditId] = useState("");
   const [name, setName] = useState("");
-  const [type, setType] = useState<AccType>("BANK");
+  const [type, setType] = useState<"BANK" | "CASH" | "CARD">("BANK");
   const [balance, setBalance] = useState("");
-  const [color, setColor] = useState(COLORS.primary);
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const totalBalance = useMemo(
-    () => accounts.reduce((sum, a) => sum + (Number(a.balance) || 0), 0),
-    [accounts]
-  );
+  useEffect(() => {
+    const fn = () => setTick(t => t + 1);
+    store.listeners.add(fn);
+    return () => { store.listeners.delete(fn); };
+  }, []);
 
-  const openAdd = () => {
-    setEditing(null);
-    setName("");
-    setType("BANK");
-    setBalance("");
-    setColor(COLORS.primary);
-    setModalOpen(true);
-  };
+  const totalBalance = store.accounts.reduce((s, a) => s + (Number(a.balance) || 0), 0);
 
-  const openEdit = (a: Account) => {
-    setEditing(a);
-    setName(a.name);
-    setType(a.type);
-    setBalance(String(a.balance));
-    setColor(a.color || COLORS.primary);
-    setModalOpen(true);
-  };
+  const openAdd = () => { setName(""); setType("BANK"); setBalance(""); setModal("add"); };
+  const openEdit = (acc: Account) => { setEditId(acc.id); setName(acc.name); setType(acc.type); setBalance(String(acc.balance)); setModal("edit"); };
+  const closeModal = () => setModal(null);
 
   const handleSave = async () => {
     if (!name.trim()) return;
-    setSaving(true);
+    setBusy(true);
     try {
-      const payload = {
-        name: name.trim(),
-        type,
-        balance: Number(balance) || 0,
-        color,
-      };
-      if (editing) {
-        await store.updateAccount(editing.id, payload);
+      const bal = parseFloat(balance.replace(",", ".")) || 0;
+      if (modal === "add") {
+        await store.addAccount({ name: name.trim(), type, balance: bal, color: COLORS.primary });
       } else {
-        await store.addAccount(payload);
+        await store.updateAccount(editId, { name: name.trim(), type, balance: bal });
       }
-      setModalOpen(false);
-    } finally {
-      setSaving(false);
-    }
+      closeModal();
+    } finally { setBusy(false); }
   };
 
-  const typeMeta = (t: AccType) =>
-    ACCOUNT_TYPES.find((x) => x.key === t) || ACCOUNT_TYPES[0];
+  const handleDelete = (id: string, accName: string) => {
+    Alert.alert("Hesabı Sil", `"${accName}" hesabını silmek istediğinizden emin misiniz?`, [
+      { text: "Vazgeç", style: "cancel" },
+      { text: "Sil", style: "destructive", onPress: () => store.deleteAccount(id) },
+    ]);
+  };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollInside}
-      showsVerticalScrollIndicator={false}
-    >
+    <ScrollView style={s.container} contentContainerStyle={[s.scroll, { paddingBottom: 80 }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Hesaplar</Text>
-          <Text style={styles.subtitle}>Nakit, banka ve kart bakiyeleriniz</Text>
-        </View>
-        <TouchableOpacity style={styles.addBtn} onPress={openAdd}>
-          <MaterialIcons name="add" size={20} color="#fff" />
-          <Text style={styles.addBtnText}>Hesap Ekle</Text>
+      <View style={s.header}>
+        <Text style={s.pageTitle}>Hesaplar</Text>
+        <TouchableOpacity style={s.addBtn} onPress={openAdd}>
+          <MaterialIcons name="add" size={16} color="#000" />
+          <Text style={s.addBtnText}>+ Hesap</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Net worth banner */}
-      <View style={styles.netCard}>
-        <Text style={styles.netLabel}>TOPLAM VARLIK</Text>
-        <Text style={[styles.netValue, { color: totalBalance >= 0 ? COLORS.income : COLORS.expense }]}>
-          {formatTRY(totalBalance)}
+      {/* Total Balance Hero */}
+      <View style={s.heroCard}>
+        <Text style={s.heroLabel}>Toplam Bakiye</Text>
+        <Text style={[s.heroValue, { color: totalBalance < 0 ? COLORS.expense : COLORS.text }]}>
+          {totalBalance < 0 ? "-" : ""}{formatTRY(Math.abs(totalBalance))}
         </Text>
-        <Text style={styles.netSub}>{accounts.length} hesap</Text>
       </View>
 
-      {/* Account cards */}
-      {accounts.length === 0 ? (
-        <View style={styles.emptyState}>
-          <MaterialIcons name="account-balance-wallet" size={48} color={COLORS.textMuted} style={{ opacity: 0.4 }} />
-          <Text style={styles.emptyText}>Henüz hesap eklemediniz.</Text>
-          <TouchableOpacity style={[styles.addBtn, { marginTop: 16 }]} onPress={openAdd}>
-            <MaterialIcons name="add" size={18} color="#fff" />
-            <Text style={styles.addBtnText}>İlk hesabını ekle</Text>
+      {/* Account Cards Grid */}
+      {store.accounts.length === 0 ? (
+        <View style={s.emptyWrap}>
+          <Text style={s.emptyIcon}>🏦</Text>
+          <Text style={s.emptyText}>Henüz hesap eklenmedi.</Text>
+          <TouchableOpacity style={s.emptyBtn} onPress={openAdd}>
+            <Text style={s.emptyBtnText}>İlk Hesabı Ekle</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.cardsGrid}>
-          {accounts.map((a) => {
-            const meta = typeMeta(a.type);
+        <View style={s.grid}>
+          {store.accounts.map((acc) => {
+            const accType = ACCOUNT_TYPES.find(t => t.value === acc.type);
             return (
-              <View key={a.id} style={[styles.accCard, { borderTopColor: a.color || COLORS.primary }]}>
-                <View style={styles.accCardTop}>
-                  <View style={[styles.accIcon, { backgroundColor: (a.color || COLORS.primary) + "22" }]}>
-                    <MaterialIcons name={meta.icon} size={22} color={a.color || COLORS.primary} />
-                  </View>
-                  <View style={styles.accActions}>
-                    <TouchableOpacity onPress={() => openEdit(a)} style={styles.iconMini}>
-                      <MaterialIcons name="edit" size={16} color={COLORS.textMuted} />
+              <View key={acc.id} style={s.accCard}>
+                <View style={s.accCardTop}>
+                  <Text style={s.accEmoji}>{accType?.emoji || "🏦"}</Text>
+                  <View style={s.accActions}>
+                    <TouchableOpacity onPress={() => openEdit(acc)} style={s.actionBtn}>
+                      <Text style={s.editIcon}>✏️</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() =>
-                        confirmDelete(`"${a.name}" hesabını silmek istiyor musunuz?`, () =>
-                          store.deleteAccount(a.id)
-                        )
-                      }
-                      style={styles.iconMini}
-                    >
+                    <TouchableOpacity onPress={() => handleDelete(acc.id, acc.name)} style={s.actionBtn}>
                       <MaterialIcons name="delete-outline" size={16} color={COLORS.textMuted} />
                     </TouchableOpacity>
                   </View>
                 </View>
-                <Text style={styles.accName}>{a.name}</Text>
-                <Text style={styles.accType}>{meta.label}</Text>
-                <Text style={[styles.accBalance, { color: a.balance >= 0 ? COLORS.text : COLORS.expense }]}>
-                  {formatTRY(a.balance)}
+                <Text style={s.accName}>{acc.name}</Text>
+                <Text style={s.accTypeLbl}>{accType?.label || acc.type}</Text>
+                <Text style={[s.accBalance, { color: acc.balance < 0 ? COLORS.expense : COLORS.text }]}>
+                  {acc.balance < 0 ? "-" : ""}{formatTRY(Math.abs(acc.balance))}
                 </Text>
               </View>
             );
@@ -180,61 +113,34 @@ export default function AccountsScreen() {
         </View>
       )}
 
-      {/* Add / Edit Modal */}
-      <Modal visible={modalOpen} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback onPress={() => setModalOpen(false)}>
-            <View style={StyleSheet.absoluteFill} />
-          </TouchableWithoutFeedback>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{editing ? "Hesabı Düzenle" : "Yeni Hesap"}</Text>
+      {/* Add/Edit Modal */}
+      <Modal visible={modal !== null} transparent animationType="fade">
+        <View style={s.overlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeModal} />
+          <View style={s.modalBox}>
+            <Text style={s.modalTitle}>{modal === "add" ? "Yeni Hesap" : "Hesabı Düzenle"}</Text>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Hesap adı (örn. Ziraat Vadesiz)"
-              placeholderTextColor={COLORS.textMuted}
-              value={name}
-              onChangeText={setName}
-            />
+            <Text style={s.lbl}>Hesap Adı</Text>
+            <TextInput style={s.input} value={name} onChangeText={setName} placeholder="Hesap adı" placeholderTextColor={COLORS.textMuted} />
 
-            <Text style={styles.fieldLabel}>Tür</Text>
-            <View style={styles.typeRow}>
-              {ACCOUNT_TYPES.map((t) => (
-                <TouchableOpacity
-                  key={t.key}
-                  style={[styles.typeChip, type === t.key && styles.typeChipActive]}
-                  onPress={() => setType(t.key)}
-                >
-                  <MaterialIcons name={t.icon} size={16} color={type === t.key ? "#fff" : COLORS.textMuted} />
-                  <Text style={[styles.typeChipText, type === t.key && { color: "#fff" }]}>{t.label}</Text>
+            <Text style={s.lbl}>Tür</Text>
+            <View style={s.typeRow}>
+              {ACCOUNT_TYPES.map(t => (
+                <TouchableOpacity key={t.value} style={[s.typeChip, type === t.value && s.typeChipActive]} onPress={() => setType(t.value as any)}>
+                  <Text style={s.typeChipText}>{t.emoji} {t.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={styles.fieldLabel}>Bakiye (₺)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="0"
-              placeholderTextColor={COLORS.textMuted}
-              value={balance}
-              onChangeText={setBalance}
-              keyboardType="numeric"
-            />
+            <Text style={s.lbl}>Bakiye (₺)</Text>
+            <TextInput style={s.input} value={balance} onChangeText={setBalance} placeholder="0.00" placeholderTextColor={COLORS.textMuted} keyboardType="decimal-pad" />
 
-            <Text style={styles.fieldLabel}>Renk</Text>
-            <View style={styles.colorRow}>
-              {COLOR_CHOICES.map((c) => (
-                <TouchableOpacity
-                  key={c}
-                  onPress={() => setColor(c)}
-                  style={[styles.colorDot, { backgroundColor: c }, color === c && styles.colorDotActive]}
-                />
-              ))}
+            <View style={s.btnRow}>
+              <TouchableOpacity style={s.cancelBtn} onPress={closeModal}><Text style={s.cancelText}>İptal</Text></TouchableOpacity>
+              <TouchableOpacity style={s.saveBtn} onPress={handleSave} disabled={busy}>
+                {busy ? <ActivityIndicator color="#000" size="small" /> : <Text style={s.saveText}>Kaydet</Text>}
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{editing ? "Güncelle" : "Kaydet"}</Text>}
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -242,45 +148,47 @@ export default function AccountsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scrollInside: { padding: 32 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 },
-  title: { fontSize: 28, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
-  subtitle: { fontSize: 13, color: COLORS.textMuted, marginTop: 4 },
-  addBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: COLORS.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
-  addBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  scroll: { padding: 20 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  pageTitle: { color: "#fff", fontSize: 22, fontWeight: "800" },
+  addBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: COLORS.primary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  addBtnText: { color: "#000", fontWeight: "700", fontSize: 13 },
 
-  netCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.border, marginBottom: 24 },
-  netLabel: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1.2 },
-  netValue: { fontSize: 34, fontWeight: "900", marginTop: 8, fontFamily: MONO },
-  netSub: { fontSize: 12, color: COLORS.textMuted, marginTop: 4 },
+  heroCard: { backgroundColor: COLORS.card, borderRadius: 12, padding: 24, marginBottom: 16, borderWidth: 1, borderColor: COLORS.border },
+  heroLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: "600", marginBottom: 8 },
+  heroValue: { fontSize: 32, fontWeight: "800", fontFamily: MONO },
 
-  cardsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
-  accCard: { width: 240, backgroundColor: COLORS.card, borderRadius: 14, padding: 20, borderWidth: 1, borderColor: COLORS.border, borderTopWidth: 3 },
-  accCardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  accIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  accActions: { flexDirection: "row", gap: 4 },
-  iconMini: { padding: 6 },
-  accName: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  accType: { color: COLORS.textMuted, fontSize: 12, marginTop: 2 },
-  accBalance: { fontSize: 22, fontWeight: "800", marginTop: 16, fontFamily: MONO },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  accCard: { flex: 1, minWidth: 140, maxWidth: "100%", backgroundColor: COLORS.card, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: COLORS.border },
+  accCardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
+  accEmoji: { fontSize: 24 },
+  accActions: { flexDirection: "row", gap: 6 },
+  actionBtn: { padding: 4 },
+  editIcon: { fontSize: 14 },
+  accName: { color: COLORS.text, fontSize: 14, fontWeight: "700", marginBottom: 2 },
+  accTypeLbl: { color: COLORS.textMuted, fontSize: 11, marginBottom: 10 },
+  accBalance: { fontSize: 20, fontWeight: "800", fontFamily: MONO },
 
-  emptyState: { alignItems: "center", justifyContent: "center", paddingVertical: 60 },
-  emptyText: { color: COLORS.textMuted, fontSize: 14, marginTop: 16 },
+  emptyWrap: { alignItems: "center", paddingVertical: 48, gap: 12 },
+  emptyIcon: { fontSize: 40 },
+  emptyText: { color: COLORS.textMuted, fontSize: 14 },
+  emptyBtn: { backgroundColor: COLORS.primary, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
+  emptyBtnText: { color: "#000", fontWeight: "700", fontSize: 13 },
 
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", alignItems: "center", padding: 20 },
-  modalContent: { width: "100%", maxWidth: 460, backgroundColor: COLORS.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: COLORS.border },
-  modalTitle: { fontSize: 20, fontWeight: "800", color: "#fff", marginBottom: 20 },
-  input: { backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 14, color: "#fff", fontSize: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 4 },
-  fieldLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: "700", marginTop: 16, marginBottom: 8 },
-  typeRow: { flexDirection: "row", gap: 8 },
-  typeChip: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: COLORS.border },
-  typeChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  typeChipText: { color: COLORS.textMuted, fontWeight: "700", fontSize: 12 },
-  colorRow: { flexDirection: "row", gap: 12 },
-  colorDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "transparent" },
-  colorDotActive: { borderColor: "#fff" },
-  saveBtn: { backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 24 },
-  saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 20 },
+  modalBox: { width: "100%", maxWidth: 400, backgroundColor: "#1a1f2e", borderRadius: 16, padding: 24, borderWidth: 1, borderColor: COLORS.border },
+  modalTitle: { color: "#fff", fontSize: 18, fontWeight: "800", marginBottom: 20 },
+  lbl: { color: COLORS.textMuted, fontSize: 11, fontWeight: "700", marginBottom: 6 },
+  input: { backgroundColor: COLORS.cardSecondary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, color: "#fff", fontSize: 14, borderWidth: 1, borderColor: COLORS.border, marginBottom: 14 },
+  typeRow: { flexDirection: "row", gap: 8, marginBottom: 14, flexWrap: "wrap" },
+  typeChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.cardSecondary },
+  typeChipActive: { backgroundColor: "rgba(0,201,167,0.15)", borderColor: COLORS.primary },
+  typeChipText: { color: COLORS.text, fontSize: 12, fontWeight: "600" },
+  btnRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+  cancelBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 10, backgroundColor: COLORS.cardSecondary, borderWidth: 1, borderColor: COLORS.border },
+  cancelText: { color: COLORS.textSecondary, fontWeight: "700" },
+  saveBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 10, backgroundColor: COLORS.primary },
+  saveText: { color: "#000", fontWeight: "800" },
 });

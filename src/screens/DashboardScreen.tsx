@@ -1,44 +1,24 @@
 // src/screens/DashboardScreen.tsx
 import React, { useState, useEffect, useMemo } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity,
-  Dimensions,
-  Platform,
-  Modal,
-  TouchableWithoutFeedback,
-  TextInput,
-  ActivityIndicator,
-  useWindowDimensions
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Modal, TouchableWithoutFeedback, TextInput, ActivityIndicator,
+  useWindowDimensions, Platform,
 } from "react-native";
 import {
-  updateProfile,
-  updatePassword,
-  reauthenticateWithCredential,
-  EmailAuthProvider,
+  updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider,
 } from "firebase/auth";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import Svg, { Circle, Rect } from "react-native-svg";
+import Svg, { Circle, Line, Polyline, Text as SvgText } from "react-native-svg";
 import { format, subMonths, startOfMonth, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
 import { store } from "../store";
 import { auth } from "../services/firebase";
-import { COLORS, MONO, RADII, Transaction } from "../theme/constants";
+import { COLORS, MONO, Transaction } from "../theme/constants";
 import { formatTRY } from "../utils/format";
+import Sidebar from "../components/Sidebar";
 
-const monthKey = (d: string) => {
-  try {
-    return format(d.includes("T") ? parseISO(d) : new Date(d), "yyyy-MM");
-  } catch {
-    return "";
-  }
-};
-
-// Import Placeholder Screens
 import TransactionsScreen from "./TransactionsScreen";
 import AccountsScreen from "./AccountsScreen";
 import BudgetScreen from "./BudgetScreen";
@@ -46,11 +26,22 @@ import BillsScreen from "./BillsScreen";
 import InvestmentsScreen from "./InvestmentsScreen";
 import GoalsScreen from "./GoalsScreen";
 import DebtsScreen from "./DebtsScreen";
-import CurrencyScreen from "./CurrencyScreen";
-import TaxScreen from "./TaxScreen";
 import ReportsScreen from "./ReportsScreen";
+import SettingsScreen from "./SettingsScreen";
+import FamilyScreen from "./FamilyScreen";
 
-import Sidebar from "../components/Sidebar";
+const monthKey = (d: string) => {
+  try { return format(d.includes("T") ? parseISO(d) : new Date(d), "yyyy-MM"); }
+  catch { return ""; }
+};
+
+const BOTTOM_TABS = [
+  { icon: "dashboard", label: "Panel", target: "Dashboard" },
+  { icon: "swap-vert", label: "İşlemler", target: "İşlemler" },
+  { icon: "account-balance", label: "Hesaplar", target: "Hesaplar" },
+  { icon: "pie-chart", label: "Bütçe", target: "Bütçe" },
+  { icon: "menu", label: "Menü", target: "__menu__" },
+];
 
 export default function DashboardScreen() {
   const { width } = useWindowDimensions();
@@ -58,10 +49,8 @@ export default function DashboardScreen() {
 
   const [tick, setTick] = useState(0);
   const [activeTab, setActiveTab] = useState("Dashboard");
-  const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-
-  // Profil paneli: "menu" | "name" | "password"
+  const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
   const [profileView, setProfileView] = useState<"menu" | "name" | "password">("menu");
   const [nameInput, setNameInput] = useState("");
   const [currentPw, setCurrentPw] = useState("");
@@ -71,603 +60,539 @@ export default function DashboardScreen() {
   const [profileError, setProfileError] = useState("");
   const [profileOk, setProfileOk] = useState("");
 
-  const openProfile = () => {
-    setProfileView("menu");
-    setProfileError("");
-    setProfileOk("");
-    setIsProfileModalVisible(true);
-  };
-
-  const goProfileView = (v: "menu" | "name" | "password") => {
-    setProfileError("");
-    setProfileOk("");
-    if (v === "name") setNameInput(auth.currentUser?.displayName || "");
-    if (v === "password") {
-      setCurrentPw("");
-      setNewPw("");
-      setNewPw2("");
-    }
-    setProfileView(v);
-  };
-
-  const handleSaveName = async () => {
-    const user = auth.currentUser;
-    if (!user || !nameInput.trim()) return;
-    setProfileBusy(true);
-    setProfileError("");
-    try {
-      await updateProfile(user, { displayName: nameInput.trim() });
-      setProfileOk("Adınız güncellendi.");
-      setTick((t) => t + 1); // kenar menüdeki ad/baş harfleri tazele
-      setProfileView("menu");
-    } catch (e: any) {
-      setProfileError(authErrorText(e?.code));
-    } finally {
-      setProfileBusy(false);
-    }
-  };
-
-  const handleChangePassword = async () => {
-    const user = auth.currentUser;
-    if (!user?.email) return;
-    if (newPw.length < 6) {
-      setProfileError("Yeni şifre en az 6 karakter olmalı.");
-      return;
-    }
-    if (newPw !== newPw2) {
-      setProfileError("Yeni şifreler birbiriyle eşleşmiyor.");
-      return;
-    }
-    setProfileBusy(true);
-    setProfileError("");
-    try {
-      // Firebase şifre değişimi için yakın zamanda giriş yapılmış olmasını ister.
-      const cred = EmailAuthProvider.credential(user.email, currentPw);
-      await reauthenticateWithCredential(user, cred);
-      await updatePassword(user, newPw);
-      setProfileOk("Şifreniz değiştirildi.");
-      setProfileView("menu");
-    } catch (e: any) {
-      setProfileError(authErrorText(e?.code));
-    } finally {
-      setProfileBusy(false);
-    }
-  };
-
   useEffect(() => {
     const fn = () => setTick(t => t + 1);
     store.listeners.add(fn);
     return () => { store.listeners.delete(fn); };
   }, []);
 
-  const handleLogout = () => {
-    auth.signOut();
+  const handleLogout = () => auth.signOut();
+
+  const openProfile = () => {
+    setProfileView("menu"); setProfileError(""); setProfileOk(""); setIsProfileModalVisible(true);
+  };
+  const goProfileView = (v: "menu" | "name" | "password") => {
+    setProfileError(""); setProfileOk("");
+    if (v === "name") setNameInput(auth.currentUser?.displayName || "");
+    if (v === "password") { setCurrentPw(""); setNewPw(""); setNewPw2(""); }
+    setProfileView(v);
+  };
+  const handleSaveName = async () => {
+    const user = auth.currentUser; if (!user || !nameInput.trim()) return;
+    setProfileBusy(true); setProfileError("");
+    try {
+      await updateProfile(user, { displayName: nameInput.trim() });
+      setProfileOk("Adınız güncellendi."); setTick(t => t + 1); setProfileView("menu");
+    } catch (e: any) { setProfileError(authErrorText(e?.code)); }
+    finally { setProfileBusy(false); }
+  };
+  const handleChangePassword = async () => {
+    const user = auth.currentUser; if (!user?.email) return;
+    if (newPw.length < 6) { setProfileError("Yeni şifre en az 6 karakter olmalı."); return; }
+    if (newPw !== newPw2) { setProfileError("Şifreler eşleşmiyor."); return; }
+    setProfileBusy(true); setProfileError("");
+    try {
+      const cred = EmailAuthProvider.credential(user.email, currentPw);
+      await reauthenticateWithCredential(user, cred);
+      await updatePassword(user, newPw);
+      setProfileOk("Şifreniz değiştirildi."); setProfileView("menu");
+    } catch (e: any) { setProfileError(authErrorText(e?.code)); }
+    finally { setProfileBusy(false); }
   };
 
   const data = useMemo(() => {
     const txs = store.transactions;
     const now = new Date();
     const thisKey = format(now, "yyyy-MM");
-    const lastKey = format(subMonths(now, 1), "yyyy-MM");
 
-    let incThis = 0, expThis = 0, incLast = 0, expLast = 0, incAll = 0, expAll = 0;
+    let incThis = 0, expThis = 0;
     const catTotals: Record<string, number> = {};
 
     txs.forEach((t) => {
       const val = Math.abs(Number(t.amount) || 0);
       if (isNaN(val)) return;
       const k = monthKey(t.date);
-      if (t.type === "income") {
-        incAll += val;
-        if (k === thisKey) incThis += val;
-        if (k === lastKey) incLast += val;
-      } else {
-        expAll += val;
+      if (t.type === "income") { if (k === thisKey) incThis += val; }
+      else {
         if (k === thisKey) expThis += val;
-        if (k === lastKey) expLast += val;
         const cat = t.category || "Diğer";
         catTotals[cat] = (catTotals[cat] || 0) + val;
       }
     });
 
-    // Son 6 ay
-    const monthly: { key: string; label: string; income: number; expense: number }[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = startOfMonth(subMonths(now, i));
-      monthly.push({ key: format(d, "yyyy-MM"), label: format(d, "MMM", { locale: tr }), income: 0, expense: 0 });
-    }
-    const mmap = new Map(monthly.map((m) => [m.key, m]));
-    txs.forEach((t) => {
-      const m = mmap.get(monthKey(t.date));
-      if (!m) return;
-      const val = Math.abs(Number(t.amount) || 0);
-      if (t.type === "income") m.income += val;
-      else m.expense += val;
-    });
-
-    // Kategori dağılımı (ilk 5 gider)
-    const CAT_COLORS = [COLORS.expense, COLORS.info, COLORS.income, COLORS.warning, COLORS.accent2];
+    const netVarlik = store.accounts.reduce((s, a) => s + (Number(a.balance) || 0), 0);
+    const CAT_COLORS = [COLORS.expense, COLORS.info, COLORS.income, COLORS.warning, COLORS.accent2, COLORS.primary];
     const categories = Object.entries(catTotals)
       .map(([label, value]) => ({ label, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5)
+      .sort((a, b) => b.value - a.value).slice(0, 6)
       .map((c, i) => ({ ...c, color: CAT_COLORS[i % CAT_COLORS.length] }));
     const expenseTotal = Object.values(catTotals).reduce((s, v) => s + v, 0);
 
-    // Bu ay bütçe durumu
     const budgetStatus = store.budgets.map((b) => {
       const spent = txs
         .filter((t) => t.type === "expense" && t.category === b.category && monthKey(t.date) === thisKey)
         .reduce((s, t) => s + Math.abs(Number(t.amount) || 0), 0);
-      return { label: b.category, current: spent, total: b.limit, color: spent > b.limit ? COLORS.expense : COLORS.primary };
+      return { label: b.category, current: spent, total: b.limit, over: spent > b.limit };
     });
 
-    // Toplam birikim = hedefler + yatırım değeri
-    const goalsTotal = store.goals.reduce((s, g) => s + (Number(g.currentAmount) || 0), 0);
-    const invValue = store.investments.reduce((s, inv) => s + (Number(inv.amount) || 0) * (Number(inv.currentPrice) || 0), 0);
-
-    const pct = (cur: number, prev: number) => (prev > 0 ? Math.round(((cur - prev) / prev) * 100) : cur > 0 ? 100 : 0);
-
-    return {
-      income: incThis,
-      expense: expThis,
-      balance: incAll - expAll,
-      savings: goalsTotal + invValue,
-      incomeDelta: pct(incThis, incLast),
-      expenseDelta: pct(expThis, expLast),
-      monthly,
-      categories,
-      expenseTotal,
-      budgetStatus,
-      goalsCount: store.goals.length,
-    };
-  }, [store.transactions, store.budgets, store.goals, store.investments, tick]);
+    return { incThis, expThis, netVarlik, netThis: incThis - expThis, categories, expenseTotal, budgetStatus };
+  }, [store.transactions, store.accounts, store.budgets, tick]);
 
   const handleSelect = (target: string) => {
+    if (target === "__menu__") { setDrawerOpen(true); return; }
     setActiveTab(target);
     setDrawerOpen(false);
   };
 
   const renderContent = () => {
     switch (activeTab) {
-        case "İşlemler": return <TransactionsScreen />;
-        case "Hesaplar": return <AccountsScreen />;
-        case "Bütçe": return <BudgetScreen />;
-        case "Faturalar": return <BillsScreen />;
-        case "Yatırımlar": return <InvestmentsScreen />;
-        case "Hedefler": return <GoalsScreen />;
-        case "Borç / Alacak": return <DebtsScreen />;
-        case "Döviz & Kur": return <CurrencyScreen />;
-        case "Vergi": return <TaxScreen />;
-        case "Raporlar": return <ReportsScreen />;
-        default: return <DashboardMain data={data} transactions={store.transactions} isDesktop={isDesktop} />;
+      case "İşlemler": return <TransactionsScreen />;
+      case "Hesaplar": return <AccountsScreen />;
+      case "Bütçe": return <BudgetScreen />;
+      case "Faturalar": return <BillsScreen />;
+      case "Yatırımlar": return <InvestmentsScreen />;
+      case "Hedefler": return <GoalsScreen />;
+      case "Borç / Alacak": return <DebtsScreen />;
+      case "Raporlar": return <ReportsScreen />;
+      case "Aile": return <FamilyScreen />;
+      case "Ayarlar": return <SettingsScreen onLogout={handleLogout} />;
+      default: return <DashboardMain data={data} transactions={store.transactions} accounts={store.accounts} isDesktop={isDesktop} />;
     }
   };
 
+  const screenTitle = activeTab === "Dashboard" ? "Panel" : activeTab;
+  const initials = (auth.currentUser?.displayName || auth.currentUser?.email || "K").substring(0, 2).toUpperCase();
+
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
+    <SafeAreaView style={s.safe}>
+      <View style={s.body}>
         {isDesktop && (
           <Sidebar activeTab={activeTab} onSelect={handleSelect} onProfilePress={openProfile} />
         )}
-        <View style={styles.mainContentContainer}>
-          {!isDesktop && (
-            <View style={styles.mobileHeader}>
-              <TouchableOpacity onPress={() => setDrawerOpen(true)} style={styles.menuBtn}>
-                <MaterialIcons name="menu" size={24} color={COLORS.text} />
+        <View style={s.main}>
+          {/* Top bar */}
+          <View style={s.topBar}>
+            {!isDesktop && (
+              <TouchableOpacity onPress={() => setDrawerOpen(true)} style={s.menuBtn}>
+                <MaterialIcons name="menu" size={22} color={COLORS.text} />
               </TouchableOpacity>
-              <Text style={styles.mobileTitle} numberOfLines={1}>{activeTab}</Text>
-              <TouchableOpacity onPress={openProfile} style={styles.mobileAvatar}>
-                <Text style={{ color: "#000", fontWeight: "700", fontSize: 12 }}>
-                  {(auth.currentUser?.displayName || auth.currentUser?.email || "K").substring(0, 2).toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
+            )}
+            <Text style={s.topBarTitle}>{screenTitle}</Text>
+            <View style={{ flex: 1 }} />
+            <TouchableOpacity style={s.addBtn}>
+              <MaterialIcons name="add" size={16} color="#000" />
+              <Text style={s.addBtnText}>+ İşlem</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.avatarBtn} onPress={openProfile}>
+              <Text style={s.avatarBtnText}>{initials.charAt(0)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={openProfile}>
+              <Text style={s.demoLabel}>Demo</Text>
+            </TouchableOpacity>
+          </View>
+
           {renderContent()}
         </View>
       </View>
 
-      {/* Mobil Drawer */}
+      {/* Mobile Bottom Tabs */}
       {!isDesktop && (
-        <Modal visible={drawerOpen} transparent animationType="fade" onRequestClose={() => setDrawerOpen(false)}>
-          <View style={styles.drawerOverlay}>
-            <View style={styles.drawerPanel}>
+        <View style={s.bottomTabs}>
+          {BOTTOM_TABS.map((tab) => {
+            const active = activeTab === tab.target;
+            return (
+              <TouchableOpacity key={tab.target} style={s.tabItem} onPress={() => handleSelect(tab.target)}>
+                <MaterialIcons name={tab.icon as any} size={22} color={active ? COLORS.primary : COLORS.textMuted} />
+                <Text style={[s.tabLabel, active && { color: COLORS.primary }]}>{tab.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Mobile Drawer */}
+      {!isDesktop && (
+        <Modal visible={drawerOpen} transparent animationType="slide" onRequestClose={() => setDrawerOpen(false)}>
+          <View style={s.drawerOverlay}>
+            <View style={s.drawerPanel}>
               <Sidebar activeTab={activeTab} onSelect={handleSelect} onProfilePress={() => { setDrawerOpen(false); openProfile(); }} />
             </View>
             <TouchableWithoutFeedback onPress={() => setDrawerOpen(false)}>
-              <View style={styles.drawerBackdrop} />
+              <View style={s.drawerBackdrop} />
             </TouchableWithoutFeedback>
           </View>
         </Modal>
       )}
 
-      {/* Profile Settings Modal */}
+      {/* Profile Modal */}
       <Modal visible={isProfileModalVisible} transparent animationType="fade">
-          <View style={styles.profileModalOverlay}>
-              <TouchableWithoutFeedback onPress={() => setIsProfileModalVisible(false)}>
-                  <View style={StyleSheet.absoluteFill} />
-              </TouchableWithoutFeedback>
-              <View style={styles.profileModalContent}>
-                  <View style={styles.profileModalHeader}>
-                      <View style={styles.largeAvatar}>
-                          <Text style={styles.largeAvatarText}>
-                              {(auth.currentUser?.displayName || auth.currentUser?.email || "K").substring(0, 2).toUpperCase()}
-                          </Text>
-                      </View>
-                      <Text style={styles.modalUserName}>{auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0]}</Text>
-                      <Text style={styles.modalUserEmail}>{auth.currentUser?.email}</Text>
-                  </View>
-
-                  {!!profileOk && <Text style={styles.profileOk}>{profileOk}</Text>}
-                  {!!profileError && <Text style={styles.profileErr}>{profileError}</Text>}
-
-                  {profileView === "menu" && (
-                    <>
-                      <View style={styles.modalMenu}>
-                          <ProfileMenuItem icon="person-outline" label="Profil Bilgileri" onPress={() => goProfileView("name")} />
-                          <ProfileMenuItem icon="lock-outline" label="Şifre Değiştir" onPress={() => goProfileView("password")} />
-                      </View>
-
-                      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-                          <MaterialIcons name="logout" size={20} color={COLORS.expense} />
-                          <Text style={styles.logoutText}>Çıkış Yap</Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-
-                  {profileView === "name" && (
-                    <View>
-                      <Text style={styles.profileFieldLabel}>Görünen ad</Text>
-                      <TextInput
-                        style={styles.profileInput}
-                        value={nameInput}
-                        onChangeText={setNameInput}
-                        placeholder="Adınız"
-                        placeholderTextColor={COLORS.textMuted}
-                        autoFocus
-                      />
-                      <View style={styles.profileBtnRow}>
-                        <TouchableOpacity style={styles.profileCancelBtn} onPress={() => goProfileView("menu")}>
-                          <Text style={styles.profileCancelText}>Vazgeç</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.profileSaveBtn} onPress={handleSaveName} disabled={profileBusy}>
-                          {profileBusy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.profileSaveText}>Kaydet</Text>}
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-
-                  {profileView === "password" && (
-                    <View>
-                      <Text style={styles.profileFieldLabel}>Mevcut şifre</Text>
-                      <TextInput style={styles.profileInput} value={currentPw} onChangeText={setCurrentPw} secureTextEntry placeholder="••••••" placeholderTextColor={COLORS.textMuted} />
-                      <Text style={styles.profileFieldLabel}>Yeni şifre</Text>
-                      <TextInput style={styles.profileInput} value={newPw} onChangeText={setNewPw} secureTextEntry placeholder="En az 6 karakter" placeholderTextColor={COLORS.textMuted} />
-                      <Text style={styles.profileFieldLabel}>Yeni şifre (tekrar)</Text>
-                      <TextInput style={styles.profileInput} value={newPw2} onChangeText={setNewPw2} secureTextEntry placeholder="••••••" placeholderTextColor={COLORS.textMuted} />
-                      <View style={styles.profileBtnRow}>
-                        <TouchableOpacity style={styles.profileCancelBtn} onPress={() => goProfileView("menu")}>
-                          <Text style={styles.profileCancelText}>Vazgeç</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.profileSaveBtn} onPress={handleChangePassword} disabled={profileBusy}>
-                          {profileBusy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.profileSaveText}>Değiştir</Text>}
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
+        <View style={s.modalOverlay}>
+          <TouchableWithoutFeedback onPress={() => setIsProfileModalVisible(false)}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+          <View style={s.modalContent}>
+            <View style={s.modalHeader}>
+              <View style={s.modalAvatar}>
+                <Text style={s.modalAvatarText}>{initials}</Text>
               </View>
+              <Text style={s.modalName}>{auth.currentUser?.displayName || auth.currentUser?.email?.split("@")[0]}</Text>
+              <Text style={s.modalEmail}>{auth.currentUser?.email}</Text>
+            </View>
+            {!!profileOk && <Text style={s.okText}>{profileOk}</Text>}
+            {!!profileError && <Text style={s.errText}>{profileError}</Text>}
+            {profileView === "menu" && (
+              <>
+                <TouchableOpacity style={s.menuRow} onPress={() => goProfileView("name")}>
+                  <MaterialIcons name="person-outline" size={20} color={COLORS.textSecondary} />
+                  <Text style={s.menuRowLabel}>Profil Bilgileri</Text>
+                  <MaterialIcons name="chevron-right" size={18} color={COLORS.textMuted} />
+                </TouchableOpacity>
+                <TouchableOpacity style={s.menuRow} onPress={() => goProfileView("password")}>
+                  <MaterialIcons name="lock-outline" size={20} color={COLORS.textSecondary} />
+                  <Text style={s.menuRowLabel}>Şifre Değiştir</Text>
+                  <MaterialIcons name="chevron-right" size={18} color={COLORS.textMuted} />
+                </TouchableOpacity>
+                <TouchableOpacity style={s.logoutRow} onPress={handleLogout}>
+                  <MaterialIcons name="logout" size={18} color={COLORS.expense} />
+                  <Text style={s.logoutText}>Çıkış Yap</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            {profileView === "name" && (
+              <View>
+                <Text style={s.fieldLabel}>Görünen ad</Text>
+                <TextInput style={s.fieldInput} value={nameInput} onChangeText={setNameInput} placeholder="Adınız" placeholderTextColor={COLORS.textMuted} autoFocus />
+                <View style={s.btnRow}>
+                  <TouchableOpacity style={s.cancelBtn} onPress={() => goProfileView("menu")}><Text style={s.cancelText}>Vazgeç</Text></TouchableOpacity>
+                  <TouchableOpacity style={s.saveBtn} onPress={handleSaveName} disabled={profileBusy}>
+                    {profileBusy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.saveText}>Kaydet</Text>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+            {profileView === "password" && (
+              <View>
+                <Text style={s.fieldLabel}>Mevcut şifre</Text>
+                <TextInput style={s.fieldInput} value={currentPw} onChangeText={setCurrentPw} secureTextEntry placeholder="••••••" placeholderTextColor={COLORS.textMuted} />
+                <Text style={s.fieldLabel}>Yeni şifre</Text>
+                <TextInput style={s.fieldInput} value={newPw} onChangeText={setNewPw} secureTextEntry placeholder="En az 6 karakter" placeholderTextColor={COLORS.textMuted} />
+                <Text style={s.fieldLabel}>Yeni şifre (tekrar)</Text>
+                <TextInput style={s.fieldInput} value={newPw2} onChangeText={setNewPw2} secureTextEntry placeholder="••••••" placeholderTextColor={COLORS.textMuted} />
+                <View style={s.btnRow}>
+                  <TouchableOpacity style={s.cancelBtn} onPress={() => goProfileView("menu")}><Text style={s.cancelText}>Vazgeç</Text></TouchableOpacity>
+                  <TouchableOpacity style={s.saveBtn} onPress={handleChangePassword} disabled={profileBusy}>
+                    {profileBusy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.saveText}>Değiştir</Text>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
 }
 
-// Firebase hata kodlarını okunur Türkçeye çevirir.
 const authErrorText = (code?: string) => {
-    switch (code) {
-        case "auth/wrong-password":
-        case "auth/invalid-credential":
-            return "Mevcut şifre hatalı.";
-        case "auth/weak-password":
-            return "Yeni şifre çok zayıf (en az 6 karakter).";
-        case "auth/requires-recent-login":
-            return "Güvenlik için çıkış yapıp tekrar giriş yapın.";
-        case "auth/too-many-requests":
-            return "Çok fazla deneme yapıldı, biraz sonra tekrar deneyin.";
-        case "auth/network-request-failed":
-            return "İnternet bağlantısı kurulamadı.";
-        default:
-            return "İşlem tamamlanamadı, lütfen tekrar deneyin.";
-    }
+  switch (code) {
+    case "auth/wrong-password": case "auth/invalid-credential": return "Mevcut şifre hatalı.";
+    case "auth/weak-password": return "Şifre çok zayıf (min 6 karakter).";
+    case "auth/requires-recent-login": return "Güvenlik için çıkış yapıp tekrar giriş yapın.";
+    case "auth/too-many-requests": return "Çok fazla deneme, biraz sonra tekrar deneyin.";
+    default: return "İşlem tamamlanamadı.";
+  }
 };
 
-const ProfileMenuItem = ({ icon, label, onPress }: any) => (
-    <TouchableOpacity style={styles.profileMenuItem} onPress={onPress}>
-        <MaterialIcons name={icon} size={22} color={COLORS.textSecondary} />
-        <Text style={styles.profileMenuLabel}>{label}</Text>
-        <MaterialIcons name="chevron-right" size={20} color={COLORS.textMuted} />
-    </TouchableOpacity>
-);
+// ─── Dashboard Main ─────────────────────────────────────────────────────────
+const DashboardMain = ({ data, transactions, accounts, isDesktop }: any) => {
+  const col = !isDesktop;
+  return (
+    <ScrollView style={s.content} contentContainerStyle={[s.scroll, !isDesktop && { padding: 16, paddingBottom: 80 }]}>
+      {/* 4 KPI Cards */}
+      <View style={[s.kpiRow, col && { flexDirection: "column" }]}>
+        <KpiCard title="Net Varlık" value={data.netVarlik} sub="Tüm hesaplar" icon="💎" color={COLORS.info} />
+        <KpiCard title="Bu Ay Gelir" value={data.incThis} sub="Bu ay" icon="📥" color={COLORS.income} />
+        <KpiCard title="Bu Ay Gider" value={data.expThis} sub="Bu ay" icon="📤" color={COLORS.expense} />
+        <KpiCard title="Bu Ay Net" value={data.netThis} sub="Gelir - Gider" icon="📋" color={data.netThis >= 0 ? COLORS.income : COLORS.expense} />
+      </View>
 
-const DashboardMain = ({ data, transactions, isDesktop }: { data: any, transactions: Transaction[], isDesktop: boolean }) => {
-    const deltaText = (d: number) => (d === 0 ? "Değişim yok" : `${d > 0 ? "+" : ""}${d}% geçen ay`);
-    const stackCol = !isDesktop && { flexDirection: "column" as const };
-    const panelFull = isDesktop ? null : { width: "100%" as const, flex: undefined, marginBottom: 16 };
-    return (
-        <ScrollView style={styles.content} contentContainerStyle={[styles.scrollInside, !isDesktop && { padding: 16 }]}>
-            {/* Top Stat Row */}
-            <View style={styles.statRow}>
-                <StatBox title="Bu Ay Gelir" value={data.income} color={COLORS.income} sub={deltaText(data.incomeDelta)} icon="payments" />
-                <StatBox title="Bu Ay Gider" value={data.expense} color={COLORS.expense} sub={deltaText(data.expenseDelta)} icon="shopping-cart" />
-                <StatBox title="Net Bakiye" value={data.balance} color={COLORS.warning} sub={data.balance >= 0 ? "Olumlu" : "Negatif"} icon="account-balance-wallet" />
-                <StatBox title="Toplam Birikim" value={data.savings} color={COLORS.primary} sub={`${data.goalsCount} aktif hedef`} icon="savings" />
-            </View>
-
-            {/* Charts Row */}
-            <View style={[styles.chartsRow, stackCol]}>
-                <View style={[styles.panel, { flex: 1 }, panelFull]}>
-                    <Text style={styles.panelTitle}>AYLIK GELİR / GİDER</Text>
-                    <CustomBarChart monthly={data.monthly} />
-                </View>
-                <View style={[styles.panel, { flex: 0.8 }, panelFull]}>
-                    <Text style={styles.panelTitle}>KATEGORİ DAĞILIMI</Text>
-                    <CustomDoughnut data={data.categories} total={data.expenseTotal} />
-                </View>
-            </View>
-
-            {/* Bottom Panels */}
-            <View style={[styles.panelGrid, stackCol]}>
-                <View style={[styles.panel, { flex: 1 }, panelFull]}>
-                    <Text style={styles.panelTitle}>SON İŞLEMLER</Text>
-                    <View style={styles.txnList}>
-                        {transactions.length === 0 ? (
-                            <Text style={styles.emptyHint}>Henüz işlem yok.</Text>
-                        ) : (
-                            transactions.slice(0, 6).map((tx) => <TxnItem key={tx.id} tx={tx} />)
-                        )}
-                    </View>
-                </View>
-
-                <View style={[styles.panel, { flex: 0.8 }, panelFull]}>
-                    <Text style={styles.panelTitle}>BÜTÇE DURUMU (BU AY)</Text>
-                    {data.budgetStatus.length === 0 ? (
-                        <Text style={styles.emptyHint}>Bütçe tanımlanmadı. "Bütçe" sekmesinden ekleyebilirsiniz.</Text>
-                    ) : (
-                        data.budgetStatus.map((b: any) => (
-                            <BudgetProgress key={b.label} label={b.label} current={b.current} total={b.total} color={b.color} />
-                        ))
-                    )}
-                </View>
-            </View>
-        </ScrollView>
-    );
-};
-
-// --- Custom Components (Cross-Platform Safe) ---
-
-const CustomBarChart = ({ monthly }: any) => {
-    const maxVal = Math.max(...monthly.map((m: any) => Math.max(m.income, m.expense)), 1);
-
-    return (
-        <View style={styles.barChartContainer}>
-            <View style={styles.barChartDrawArea}>
-                {monthly.map((m: any, i: number) => {
-                    const isCurrent = i === monthly.length - 1;
-                    const incH = (m.income / maxVal) * 100;
-                    const expH = (m.expense / maxVal) * 100;
-
-                    return (
-                        <View key={m.key} style={styles.barGroup}>
-                            <View style={styles.barsContainer}>
-                                <View style={[styles.bar, { height: `${isNaN(incH) ? 0 : incH}%`, backgroundColor: COLORS.income, opacity: isCurrent ? 1 : 0.4 }]} />
-                                <View style={[styles.bar, { height: `${isNaN(expH) ? 0 : expH}%`, backgroundColor: COLORS.expense, opacity: isCurrent ? 1 : 0.4 }]} />
-                            </View>
-                            <Text style={styles.barLabel}>{m.label}</Text>
-                        </View>
-                    );
-                })}
-            </View>
-            <View style={styles.barLegend}>
-                <View style={styles.legendItem}><View style={[styles.dot, { backgroundColor: COLORS.income }]} /><Text style={styles.legendText}>Gelir</Text></View>
-                <View style={styles.legendItem}><View style={[styles.dot, { backgroundColor: COLORS.expense }]} /><Text style={styles.legendText}>Gider</Text></View>
-            </View>
+      {/* Charts Row */}
+      <View style={[s.chartsRow, col && { flexDirection: "column" }]}>
+        <View style={[s.panel, { flex: 1.2 }, col && s.panelFull]}>
+          <View style={s.panelHeader}>
+            <Text style={s.panelTitle}>Gider Dağılımı</Text>
+            <Text style={s.panelSub}>{format(new Date(), "MMM yyyy", { locale: tr })}</Text>
+          </View>
+          <DonutChart data={data.categories} total={data.expenseTotal} />
         </View>
-    );
+        <View style={[s.panel, { flex: 1 }, col && s.panelFull]}>
+          <View style={s.panelHeader}>
+            <Text style={s.panelTitle}>Bütçe Durumu</Text>
+            <TouchableOpacity><Text style={s.linkText}>Tümü →</Text></TouchableOpacity>
+          </View>
+          {data.budgetStatus.length === 0 ? (
+            <Text style={s.empty}>Bütçe tanımlanmadı.</Text>
+          ) : (
+            data.budgetStatus.map((b: any) => (
+              <BudgetBar key={b.label} label={b.label} current={b.current} total={b.total} over={b.over} />
+            ))
+          )}
+        </View>
+      </View>
+
+      {/* Bottom Row */}
+      <View style={[s.chartsRow, col && { flexDirection: "column" }]}>
+        <View style={[s.panel, { flex: 1.2 }, col && s.panelFull]}>
+          <View style={s.panelHeader}>
+            <Text style={s.panelTitle}>Son İşlemler</Text>
+            <TouchableOpacity><Text style={s.linkText}>Tümü →</Text></TouchableOpacity>
+          </View>
+          {transactions.length === 0 ? (
+            <Text style={s.empty}>Henüz işlem yok.</Text>
+          ) : (
+            transactions.slice(0, 6).map((tx: Transaction) => <TxRow key={tx.id} tx={tx} />)
+          )}
+        </View>
+        <View style={[s.panel, { flex: 1 }, col && s.panelFull]}>
+          <View style={s.panelHeader}>
+            <Text style={s.panelTitle}>Hesaplar</Text>
+            <TouchableOpacity><Text style={s.linkText}>Yönet →</Text></TouchableOpacity>
+          </View>
+          {accounts.length === 0 ? (
+            <Text style={s.empty}>Hesap eklenmedi.</Text>
+          ) : (
+            accounts.map((acc: any) => <AccountRow key={acc.id} acc={acc} />)
+          )}
+        </View>
+      </View>
+    </ScrollView>
+  );
 };
 
-const CustomDoughnut = ({ data, total }: any) => {
-    if (!data || data.length === 0) {
-        return (
-            <View style={styles.doughnutContainer}>
-                <Text style={styles.emptyHint}>Bu ay gider kaydı yok.</Text>
-            </View>
-        );
-    }
-    const sum = data.reduce((s: any, i: any) => s + i.value, 0) || 1;
-    let startAngle = 0;
-
-    return (
-        <View style={styles.doughnutContainer}>
-            <View style={styles.doughnutRelative}>
-                <Svg viewBox="0 0 100 100" style={styles.svg}>
-                    {data.map((item: any) => {
-                        const percentage = (item.value / sum) * 100;
-                        const dashArray = `${percentage} ${100 - percentage}`;
-                        const dashOffset = -startAngle;
-                        startAngle += percentage;
-
-                        return (
-                            <Circle
-                                key={item.label}
-                                cx="50" cy="50" r="40"
-                                fill="transparent"
-                                stroke={item.color}
-                                strokeWidth="8"
-                                strokeDasharray={dashArray}
-                                strokeDashoffset={dashOffset}
-                                rotation="-90"
-                                origin="50, 50"
-                            />
-                        );
-                    })}
-                </Svg>
-                <View style={styles.doughnutCenter}>
-                    <Text style={styles.doughnutCenterText}>Toplam Gider</Text>
-                    <Text style={styles.doughnutCenterSub}>{formatTRY(total)}</Text>
-                </View>
-            </View>
-            <View style={styles.doughnutLegend}>
-                {data.map((item: any) => (
-                    <View key={item.label} style={styles.legendItem}>
-                        <View style={[styles.dot, { backgroundColor: item.color }]} />
-                        <Text style={styles.legendText}>{item.label}</Text>
-                    </View>
-                ))}
-            </View>
-        </View>
-    );
-};
-
-const StatBox = ({ title, value, color, sub, icon }: any) => (
-    <View style={[styles.statBox, { borderTopColor: color }]}>
-        <Text style={styles.statBoxTitle}>{title}</Text>
-        <Text style={[styles.statBoxValue, { color: title === "Bu Ay Gider" ? COLORS.expense : color }]}>
-            ₺{new Intl.NumberFormat("tr-TR").format(value)}
-        </Text>
-        <Text style={styles.statBoxSub}>{sub}</Text>
-        <View style={styles.statBoxIcon}>
-            <MaterialIcons name={icon} size={32} color={color} style={{ opacity: 0.15 }} />
-        </View>
+const KpiCard = ({ title, value, sub, icon, color }: any) => (
+  <View style={[s.kpiCard, { flex: 1 }]}>
+    <View style={s.kpiTop}>
+      <Text style={s.kpiTitle}>{title}</Text>
+      <Text style={s.kpiIcon}>{icon}</Text>
     </View>
+    <Text style={[s.kpiValue, { color }]}>{formatTRY(value)}</Text>
+    <Text style={s.kpiSub}>{sub}</Text>
+  </View>
 );
 
-const TxnItem = ({ tx }: { tx: Transaction }) => (
-    <View style={styles.txRow}>
-        <View style={styles.txIconBox}>
-             <MaterialIcons name="receipt" size={20} color={COLORS.textSecondary} />
+const DonutChart = ({ data, total }: any) => {
+  if (!data || data.length === 0) return <View style={s.donutWrap}><Text style={s.empty}>Gider kaydı yok.</Text></View>;
+  const sum = data.reduce((s: number, i: any) => s + i.value, 0) || 1;
+  let startAngle = 0;
+  return (
+    <View style={s.donutWrap}>
+      <View style={s.donutRow}>
+        <View style={s.donutCircle}>
+          <Svg viewBox="0 0 100 100" style={{ width: 120, height: 120 }}>
+            {data.map((item: any) => {
+              const pct = (item.value / sum) * 100;
+              const dash = `${pct} ${100 - pct}`;
+              const offset = -startAngle;
+              startAngle += pct;
+              return (
+                <Circle key={item.label} cx="50" cy="50" r="40" fill="transparent"
+                  stroke={item.color} strokeWidth="10" strokeDasharray={dash}
+                  strokeDashoffset={offset} rotation="-90" origin="50, 50" />
+              );
+            })}
+          </Svg>
+          <View style={s.donutCenter}>
+            <Text style={s.donutTotal}>{formatTRY(total)}</Text>
+          </View>
         </View>
-        <View style={{ flex: 1 }}>
-            <Text style={styles.txTitle}>{tx.description}</Text>
-            <Text style={styles.txMeta}>{tx.date}</Text>
+        <View style={s.donutLegend}>
+          {data.map((item: any) => (
+            <View key={item.label} style={s.legendRow}>
+              <View style={[s.dot, { backgroundColor: item.color }]} />
+              <Text style={s.legendText}>{item.label}</Text>
+            </View>
+          ))}
         </View>
-        <Text style={[styles.txAmount, { color: tx.type === 'income' ? COLORS.income : COLORS.expense }]}>
-            {tx.type === 'income' ? '+' : '-'}₺{new Intl.NumberFormat("tr-TR").format(tx.amount)}
-        </Text>
+      </View>
     </View>
-);
+  );
+};
 
-const BudgetProgress = ({ label, current, total, color }: any) => (
-    <View style={styles.budgetRow}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-            <Text style={{ color: '#E2E8F0', fontSize: 13, fontWeight: '600' }}>{label}</Text>
-            <Text style={{ color: '#718096', fontSize: 11 }}>{formatTRY(current)} / {formatTRY(total)}</Text>
-        </View>
-        <View style={{ height: 6, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
-            <View style={{
-                height: '100%',
-                width: `${total > 0 ? Math.min((current/total)*100, 100) : 0}%`,
-                backgroundColor: color, 
-                borderRadius: 3
-            }} />
-        </View>
+const BudgetBar = ({ label, current, total, over }: any) => {
+  const pct = total > 0 ? Math.min((current / total) * 100, 100) : 0;
+  return (
+    <View style={s.budgetRow}>
+      <View style={s.budgetTopRow}>
+        <Text style={s.budgetLabel}>{label}</Text>
+        <Text style={[s.budgetAmt, over && { color: COLORS.expense }]}>{formatTRY(current)} / {formatTRY(total)}</Text>
+      </View>
+      <View style={s.barTrack}>
+        <View style={[s.barFill, { width: `${pct}%` as any, backgroundColor: over ? COLORS.expense : COLORS.primary }]} />
+      </View>
     </View>
+  );
+};
+
+const CATEGORY_ICONS: Record<string, string> = {
+  "Maaş": "payments", "Market": "shopping-cart", "Faturalar": "bolt", "Restoran": "restaurant",
+  "Ulaşım": "directions-car", "Eğlence": "videogame-asset", "Sağlık": "fitness-center",
+  "Giyim": "checkroom", "Freelance": "laptop", "Kira Geliri": "home", "Diğer": "category",
+};
+
+const TxRow = ({ tx }: { tx: Transaction }) => (
+  <View style={s.txRow}>
+    <View style={s.txIcon}>
+      <MaterialIcons name={(CATEGORY_ICONS[tx.category] || "receipt") as any} size={18} color={COLORS.textSecondary} />
+    </View>
+    <View style={{ flex: 1 }}>
+      <Text style={s.txTitle} numberOfLines={1}>{tx.description}</Text>
+      <Text style={s.txMeta}>{tx.category} · {tx.date}</Text>
+    </View>
+    <Text style={[s.txAmt, { color: tx.type === "income" ? COLORS.income : COLORS.expense }]}>
+      {tx.type === "income" ? "+" : "-"}{formatTRY(tx.amount)}
+    </Text>
+  </View>
 );
 
-const styles = StyleSheet.create({
+const ACC_ICONS: Record<string, any> = { BANK: "account-balance", CASH: "payments", CARD: "credit-card" };
+const AccountRow = ({ acc }: { acc: any }) => (
+  <View style={s.accRow}>
+    <View style={s.accIcon}>
+      <MaterialIcons name={ACC_ICONS[acc.type] || "account-balance"} size={18} color={COLORS.textSecondary} />
+    </View>
+    <View style={{ flex: 1 }}>
+      <Text style={s.accName}>{acc.name}</Text>
+      <Text style={s.accType}>{acc.type === "BANK" ? "Banka" : acc.type === "CASH" ? "Nakit" : "Kredi Kartı"}</Text>
+    </View>
+    <Text style={[s.accAmt, { color: acc.balance < 0 ? COLORS.expense : COLORS.text }]}>
+      {acc.balance < 0 ? "-" : ""}{formatTRY(Math.abs(acc.balance))}
+    </Text>
+  </View>
+);
+
+// ─── Styles ─────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
-  container: { flex: 1, flexDirection: "row" },
-  mainContentContainer: { flex: 1 },
+  body: { flex: 1, flexDirection: "row" },
+  main: { flex: 1 },
 
-  // Mobil üst bar
-  mobileHeader: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, height: 56, borderBottomWidth: 1, borderColor: COLORS.border, backgroundColor: "#0b0d12" },
+  topBar: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 20, height: 56,
+    borderBottomWidth: 1, borderColor: COLORS.border,
+    backgroundColor: COLORS.background,
+  },
   menuBtn: { padding: 4 },
-  mobileTitle: { flex: 1, color: "#fff", fontSize: 17, fontWeight: "800" },
-  mobileAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#78dcc8", alignItems: "center", justifyContent: "center" },
+  topBarTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  addBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: COLORS.primary, borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 6,
+  },
+  addBtnText: { color: "#000", fontWeight: "700", fontSize: 12 },
+  avatarBtn: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center",
+  },
+  avatarBtnText: { color: "#000", fontWeight: "800", fontSize: 12 },
+  demoLabel: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "600" },
 
-  // Mobil drawer
+  // Bottom tabs
+  bottomTabs: {
+    flexDirection: "row", backgroundColor: COLORS.sidebar,
+    borderTopWidth: 1, borderColor: COLORS.border,
+    paddingBottom: Platform.OS === "ios" ? 16 : 4, paddingTop: 4,
+  },
+  tabItem: { flex: 1, alignItems: "center", paddingVertical: 6, gap: 2 },
+  tabLabel: { color: COLORS.textMuted, fontSize: 10, fontWeight: "600" },
+
+  // Drawer
   drawerOverlay: { flex: 1, flexDirection: "row" },
-  drawerPanel: { width: 280, maxWidth: "82%", height: "100%" },
+  drawerPanel: { width: 260, maxWidth: "80%", height: "100%" },
   drawerBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },
 
   content: { flex: 1 },
-  scrollInside: { padding: 32 },
-  statRow: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginBottom: 24 },
-  statBox: { flexGrow: 1, flexBasis: 150, minWidth: 150, backgroundColor: COLORS.card, borderRadius: 10, padding: 20, borderTopWidth: 3, position: "relative", minHeight: 120 },
-  statBoxTitle: { fontSize: 12, color: COLORS.textMuted, fontWeight: "600", marginBottom: 10 },
-  statBoxValue: { fontSize: 26, fontWeight: "800", marginBottom: 6, fontFamily: MONO },
-  statBoxSub: { fontSize: 11, color: COLORS.textMuted },
-  statBoxIcon: { position: "absolute", right: 16, bottom: 16 },
+  scroll: { padding: 24, gap: 16 },
 
-  chartsRow: { flexDirection: "row", gap: 16, marginBottom: 24 },
-  panel: { backgroundColor: COLORS.card, borderRadius: 12, padding: 24, borderWidth: 1, borderColor: COLORS.border },
-  panelTitle: { fontSize: 11, color: COLORS.textMuted, fontWeight: "700", letterSpacing: 1.2, marginBottom: 24 },
-
-  panelGrid: { flexDirection: "row", gap: 16 },
-  txnList: { gap: 1 },
-  txRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.03)" },
-  txIconBox: { width: 36, height: 36, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.03)", alignItems: "center", justifyContent: "center", marginRight: 12 },
-  txTitle: { color: COLORS.text, fontSize: 14, fontWeight: "600" },
-  txMeta: { fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
-  txAmount: { fontSize: 14, fontWeight: "700", fontFamily: MONO },
-
-  barChartContainer: { height: 260, justifyContent: "space-between" },
-  barChartDrawArea: { flex: 1, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-around", paddingBottom: 10 },
-  barGroup: { alignItems: "center", width: 40 },
-  barsContainer: { flexDirection: "row", alignItems: "flex-end", gap: 4, height: "100%", width: "100%", justifyContent: "center" },
-  bar: { width: 6, borderRadius: 3 },
-  barLabel: { fontSize: 10, color: COLORS.textMuted, marginTop: 8, fontWeight: "600" },
-  barLegend: { flexDirection: "row", justifyContent: "center", gap: 20 },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 11, color: COLORS.textSecondary, fontWeight: "500" },
-
-  doughnutContainer: { minHeight: 260, alignItems: "center", justifyContent: "center" },
-  doughnutRelative: { width: 140, height: 140, position: "relative" },
-  svg: { width: 140, height: 140 },
-  doughnutCenter: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
-  doughnutCenterText: { color: COLORS.text, fontSize: 12, fontWeight: "700" },
-  doughnutCenterSub: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
-  doughnutLegend: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 12, marginTop: 24 },
-
-  budgetRow: { marginBottom: 20 },
-  emptyHint: { color: COLORS.textMuted, fontSize: 13, textAlign: "center", paddingVertical: 24, lineHeight: 19 },
-
-  // Profile Modal Styles
-  profileModalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.3)" },
-  profileModalContent: { 
-    position: 'absolute', 
-    top: 70, 
-    left: 12, 
-    width: 280, 
-    backgroundColor: "#1c1f2b", 
-    borderRadius: 16, 
-    padding: 20, 
-    borderWidth: 1, 
-    borderColor: COLORS.border, 
-    ...Platform.select({
-        web: { boxShadow: "0px 10px 24px rgba(0,0,0,0.5)" },
-        ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20 },
-        android: { elevation: 10 }
-    })
+  kpiRow: { flexDirection: "row", gap: 12 },
+  kpiCard: {
+    backgroundColor: COLORS.card, borderRadius: 12, padding: 18,
+    borderWidth: 1, borderColor: COLORS.border,
   },
-  profileModalHeader: { alignItems: "flex-start", marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
-  largeAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#78dcc8", alignItems: "center", justifyContent: "center", marginBottom: 12 },
-  largeAvatarText: { fontSize: 16, fontWeight: "800", color: "#000" },
-  modalUserName: { fontSize: 15, fontWeight: "700", color: "#fff", marginBottom: 2 },
-  modalUserEmail: { fontSize: 11, color: COLORS.textMuted },
-  modalMenu: { marginBottom: 20 },
-  profileMenuItem: { flexDirection: "row", alignItems: "center", paddingVertical: 12 },
-  profileMenuLabel: { flex: 1, marginLeft: 12, color: COLORS.text, fontSize: 13, fontWeight: "600" },
-  profileOk: { color: COLORS.income, fontSize: 12, marginBottom: 12 },
-  profileErr: { color: COLORS.expense, fontSize: 12, marginBottom: 12 },
-  profileFieldLabel: { color: COLORS.textMuted, fontSize: 11, fontWeight: "700", marginBottom: 6 },
-  profileInput: { backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: "#fff", fontSize: 14, borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
-  profileBtnRow: { flexDirection: "row", gap: 10, marginTop: 4 },
-  profileCancelBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 10, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: COLORS.border },
-  profileCancelText: { color: COLORS.textSecondary, fontWeight: "700", fontSize: 13 },
-  profileSaveBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 10, backgroundColor: COLORS.primary },
-  profileSaveText: { color: "#fff", fontWeight: "800", fontSize: 13 },
-  logoutBtn: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderTopWidth: 1, borderColor: "rgba(255,255,255,0.05)", marginTop: 4 },
+  kpiTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  kpiTitle: { color: COLORS.textMuted, fontSize: 11, fontWeight: "600" },
+  kpiIcon: { fontSize: 20 },
+  kpiValue: { fontSize: 22, fontWeight: "800", fontFamily: MONO, marginBottom: 4 },
+  kpiSub: { color: COLORS.textMuted, fontSize: 11 },
+
+  chartsRow: { flexDirection: "row", gap: 12 },
+  panel: {
+    backgroundColor: COLORS.card, borderRadius: 12, padding: 20,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  panelFull: { width: "100%" },
+  panelHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  panelTitle: { color: COLORS.text, fontSize: 14, fontWeight: "700" },
+  panelSub: { color: COLORS.textMuted, fontSize: 12 },
+  linkText: { color: COLORS.primary, fontSize: 12, fontWeight: "600" },
+  empty: { color: COLORS.textMuted, fontSize: 13, textAlign: "center", paddingVertical: 20 },
+
+  donutWrap: { alignItems: "center" },
+  donutRow: { flexDirection: "row", alignItems: "center", gap: 20 },
+  donutCircle: { position: "relative", width: 120, height: 120, alignItems: "center", justifyContent: "center" },
+  donutCenter: { position: "absolute", alignItems: "center" },
+  donutTotal: { color: COLORS.textSecondary, fontSize: 10, fontWeight: "700" },
+  donutLegend: { gap: 6 },
+  legendRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { color: COLORS.textSecondary, fontSize: 11 },
+
+  budgetRow: { marginBottom: 14 },
+  budgetTopRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
+  budgetLabel: { color: COLORS.text, fontSize: 13, fontWeight: "600" },
+  budgetAmt: { color: COLORS.textMuted, fontSize: 11 },
+  barTrack: { height: 6, backgroundColor: COLORS.track, borderRadius: 3, overflow: "hidden" },
+  barFill: { height: "100%", borderRadius: 3 },
+
+  txRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderColor: COLORS.border, gap: 10 },
+  txIcon: { width: 34, height: 34, borderRadius: 8, backgroundColor: COLORS.cardSecondary, alignItems: "center", justifyContent: "center" },
+  txTitle: { color: COLORS.text, fontSize: 13, fontWeight: "600" },
+  txMeta: { color: COLORS.textMuted, fontSize: 11, marginTop: 2 },
+  txAmt: { fontSize: 13, fontWeight: "700", fontFamily: MONO },
+
+  accRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderColor: COLORS.border, gap: 10 },
+  accIcon: { width: 34, height: 34, borderRadius: 8, backgroundColor: COLORS.cardSecondary, alignItems: "center", justifyContent: "center" },
+  accName: { color: COLORS.text, fontSize: 13, fontWeight: "600" },
+  accType: { color: COLORS.textMuted, fontSize: 11, marginTop: 1 },
+  accAmt: { fontSize: 14, fontWeight: "700", fontFamily: MONO },
+
+  // Profile Modal
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
+  modalContent: {
+    position: "absolute", top: 70, right: 16, width: 280,
+    backgroundColor: "#1a1f2e", borderRadius: 16, padding: 20,
+    borderWidth: 1, borderColor: COLORS.border,
+    ...Platform.select({ web: { boxShadow: "0 10px 40px rgba(0,0,0,0.5)" } as any }),
+  },
+  modalHeader: { alignItems: "flex-start", marginBottom: 16, paddingBottom: 14, borderBottomWidth: 1, borderColor: COLORS.border },
+  modalAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center", marginBottom: 10 },
+  modalAvatarText: { color: "#000", fontWeight: "800", fontSize: 15 },
+  modalName: { color: "#fff", fontSize: 14, fontWeight: "700", marginBottom: 2 },
+  modalEmail: { color: COLORS.textMuted, fontSize: 11 },
+  menuRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, gap: 10 },
+  menuRowLabel: { flex: 1, color: COLORS.text, fontSize: 13, fontWeight: "600" },
+  logoutRow: { flexDirection: "row", alignItems: "center", paddingTop: 12, gap: 8, borderTopWidth: 1, borderColor: COLORS.border, marginTop: 4 },
   logoutText: { color: COLORS.expense, fontSize: 13, fontWeight: "700" },
+  okText: { color: COLORS.income, fontSize: 12, marginBottom: 10 },
+  errText: { color: COLORS.expense, fontSize: 12, marginBottom: 10 },
+  fieldLabel: { color: COLORS.textMuted, fontSize: 11, fontWeight: "700", marginBottom: 6 },
+  fieldInput: {
+    backgroundColor: COLORS.cardSecondary, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10,
+    color: "#fff", fontSize: 13, borderWidth: 1, borderColor: COLORS.border, marginBottom: 10,
+  },
+  btnRow: { flexDirection: "row", gap: 8, marginTop: 4 },
+  cancelBtn: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 8, backgroundColor: COLORS.cardSecondary, borderWidth: 1, borderColor: COLORS.border },
+  cancelText: { color: COLORS.textSecondary, fontWeight: "700", fontSize: 13 },
+  saveBtn: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 8, backgroundColor: COLORS.primary },
+  saveText: { color: "#000", fontWeight: "800", fontSize: 13 },
 });
