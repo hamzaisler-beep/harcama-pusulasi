@@ -30,7 +30,7 @@ Firebase ayarları `.env` dosyasından (`.env.example`'a bak) ya da Vercel ortam
 
 1. **Authentication > Sign-in method:** "E-posta/Şifre" ve "Google" açık olmalı.
 2. **Authentication > Settings > Authorized domains:** Vercel adresi (örn. `harcama-pusulasi-v2.vercel.app`) eklenmeli; yoksa Google girişi çalışmaz.
-3. **Firestore > Rules:** `firestore.rules` dosyasındaki "v2" bloğu mevcut kuralların içine eklenip yayınlanmalı. Eski kuralları silme; eski sürüm de aynı projeyi kullanıyor.
+3. **Firestore > Rules:** `firestore.rules` dosyasının tamamı yapıştırılıp yayınlanmalı. Eski sürümün kuralı da içinde, onu bozmaz.
 
 ## Veri yapısı
 

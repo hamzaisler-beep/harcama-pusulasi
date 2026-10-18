@@ -1,16 +1,17 @@
 rules_version = '2';
-
-// HarcamaPusulası v2 güvenlik kuralları.
-//
-// ÖNEMLİ: Aynı Firebase projesini eski sürüm de kullanıyor. Eski kuralları
-// SİLME; aşağıdaki "v2 BAŞLANGIÇ" ile "v2 BİTİŞ" arasındaki bloğu mevcut
-// kuralların içindeki  match /databases/{database}/documents { ... }
-// bloğunun içine ekle.
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ===================== v2 BAŞLANGIÇ =====================
+    // ---------- ESKİ SÜRÜM (main dalı) ----------
+    // Eski uygulamanın koleksiyonları (families, transactions, accounts...)
+    // eskisi gibi giriş yapmış herkese açık. Yeni sürümün koleksiyonları
+    // bu kuraldan hariç; onlar aşağıdaki sıkı kurallarla korunuyor.
+    match /{collection}/{document=**} {
+      allow read, write: if request.auth != null
+        && !(collection in ['users', 'invites', 'households']);
+    }
+
+    // ---------- YENİ SÜRÜM (v2 dalı) ----------
 
     function signedIn() {
       return request.auth != null;
@@ -29,11 +30,10 @@ service cloud.firestore {
       allow read, write: if signedIn() && request.auth.uid == uid;
     }
 
-    // Davet kodları: kodu bilen giriş yapmış kişi okuyabilir, listeleyemez.
+    // Davet kodları: kodu bilen okuyabilir, kimse listeleyemez.
     match /invites/{code} {
       allow get: if signedIn();
       allow list: if false;
-      // Kod, hane ile aynı anda ve sadece o hanenin üyesi tarafından oluşturulur.
       allow create: if signedIn()
         && request.auth.uid in getAfter(/databases/$(database)/documents/households/$(request.resource.data.householdId)).data.members
         && getAfter(/databases/$(database)/documents/households/$(request.resource.data.householdId)).data.inviteCode == code;
@@ -50,12 +50,12 @@ service cloud.firestore {
         && request.resource.data.inviteCode is string
         && request.resource.data.inviteCode.size() == 6;
 
-      // Üyeler hane adını değiştirebilir (üye listesine ve koda dokunmadan).
+      // Üyeler hane adını ve isimleri değiştirebilir, üye listesine dokunamaz.
       allow update: if isMember(hid)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'memberNames'])
         && request.resource.data.members == resource.data.members;
 
-      // Davet koduyla katılma: kişi sadece KENDİNİ ekleyebilir ve aynı işlemde
+      // Davet koduyla katılma: kişi sadece kendini ekler ve aynı işlemde
       // users/{uid}.joinCode alanına hanenin davet kodunu yazmış olmalı.
       allow update: if signedIn()
         && !(request.auth.uid in resource.data.members)
@@ -69,12 +69,10 @@ service cloud.firestore {
 
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
 
-      // Hanenin tüm alt verileri (işlemler, hesaplar, bütçeler...) sadece üyelere açık.
+      // Hanenin tüm alt verileri sadece üyelere açık.
       match /{document=**} {
         allow read, write: if isMember(hid);
       }
     }
-
-    // ===================== v2 BİTİŞ =====================
   }
 }
